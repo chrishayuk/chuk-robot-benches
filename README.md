@@ -23,6 +23,8 @@ another's internals.
 | `robotspec/` | standalone crate: schema v0.1, derivation pipeline v0, D/X checks, body⊂robot hashing (`robotspec show robots/<name>.json`) |
 | `parts/` | the shared content-hashed parts catalogue (robotspec + robowire cite `part@hash`) |
 | `robots/` | authored RobotSpecs — the robots, as data |
+| `robowire/` | standalone crate: netlist schema, E-check engine, schematic SVG render (`robowire check|render harness/<name>.json`) |
+| `harness/` | authored netlists — the wiring, as data |
 | `derived/` | committed derived artifacts (pipeline outputs, per derivation-pipeline v0 discipline) |
 
 Module directories appear when their first code lands (robotspec derivation library,

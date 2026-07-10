@@ -3,5 +3,11 @@
   "kind": "motor",
   "mass_g": 9.0,
   "provisional": true,
-  "notes": "brushed N20 gearmotor, 6V winding; curve fitted at Station 2 later"
+  "notes": "brushed N20 gearmotor, 6V winding; curve fitted at Station 2 later",
+  "elec": {
+    "pins": {
+      "M+": { "role": "motor_in", "required": true },
+      "M-": { "role": "motor_in", "required": true }
+    }
+  }
 }

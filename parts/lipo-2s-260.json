@@ -3,5 +3,12 @@
   "kind": "battery",
   "mass_g": 18.0,
   "provisional": true,
-  "notes": "2S 260mAh; sag curve fitted later"
+  "notes": "2S 260mAh; sag curve fitted later",
+  "elec": {
+    "pins": {
+      "+": { "role": "pos", "required": true },
+      "-": { "role": "gnd", "required": true }
+    },
+    "source": { "volts": 7.4, "c_rating": 30.0, "capacity_mah": 260.0 }
+  }
 }

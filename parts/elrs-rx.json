@@ -3,5 +3,12 @@
   "kind": "radio",
   "mass_g": 1.0,
   "provisional": true,
-  "notes": "ELRS receiver, CRSF out"
+  "notes": "ELRS receiver, CRSF out",
+  "elec": {
+    "pins": {
+      "VIN": { "role": "power_in", "v_range": [4.5, 5.5], "required": true },
+      "GND": { "role": "gnd", "required": true },
+      "TX":  { "role": "signal_out", "signal": "uart", "required": true }
+    }
+  }
 }

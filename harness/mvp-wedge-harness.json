@@ -1,0 +1,46 @@
+{
+  "name": "mvp-wedge-harness",
+  "instances": {
+    "batt": "lipo-2s-260",
+    "sw": "power-switch-slide",
+    "esc": "bbb-dual-esc",
+    "mcu": "rp2350-zero",
+    "m_l": "n20-motor-6v",
+    "m_r": "n20-motor-6v",
+    "tof_l": "vl53l0x-breakout",
+    "tof_r": "vl53l0x-breakout",
+    "imu": "imu-icm42688",
+    "rx": "elrs-rx"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
+    { "id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 7.4 },
+    { "id": "v5", "pins": ["esc.BEC5V", "mcu.5V", "rx.VIN"], "volts": 5.0 },
+    { "id": "v33", "pins": ["mcu.3V3", "tof_l.VIN", "tof_r.VIN", "imu.VIN"], "volts": 3.3 },
+    { "id": "gnd", "pins": ["batt.-", "esc.GND", "mcu.GND", "rx.GND", "tof_l.GND", "tof_r.GND", "imu.GND"] },
+    { "id": "m_l_a", "pins": ["esc.M1+", "m_l.M+"] },
+    { "id": "m_l_b", "pins": ["esc.M1-", "m_l.M-"] },
+    { "id": "m_r_a", "pins": ["esc.M2+", "m_r.M+"] },
+    { "id": "m_r_b", "pins": ["esc.M2-", "m_r.M-"] },
+    { "id": "pwm_l", "pins": ["mcu.GP2", "esc.S1"], "signal": "pwm" },
+    { "id": "pwm_r", "pins": ["mcu.GP3", "esc.S2"], "signal": "pwm" },
+    { "id": "crsf", "pins": ["rx.TX", "mcu.GP1"], "signal": "uart" }
+  ],
+  "buses": [
+    {
+      "id": "i2c0",
+      "kind": "i2c",
+      "sda": "mcu.GP4",
+      "scl": "mcu.GP5",
+      "devices": [
+        { "inst": "imu", "addr": "0x68" },
+        { "inst": "tof_l", "addr": "0x29", "reassign_to": "0x2A", "xshut": "mcu.GP6" },
+        { "inst": "tof_r", "addr": "0x29", "xshut": "mcu.GP7" }
+      ]
+    }
+  ],
+  "failsafe": {
+    "rx_loss": "CRSF failsafe frames -> kernel commands neutral -> ESC S1/S2 driven to neutral by MCU; ESC self-cuts on signal loss",
+    "stop_pins": ["esc.S1", "esc.S2"]
+  }
+}

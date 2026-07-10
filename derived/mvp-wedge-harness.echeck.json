@@ -1,0 +1,68 @@
+{
+  "checks": [
+    {
+      "code": "E01",
+      "description": "every motor terminal pair reaches exactly one driver channel",
+      "detail": "all motors paired to single driver channels",
+      "pass": true
+    },
+    {
+      "code": "E02",
+      "description": "power pins reach a rail of legal voltage",
+      "detail": "all power pins within rated ranges",
+      "pass": true
+    },
+    {
+      "code": "E03",
+      "description": "polarity continuity (no +/- swap reachable)",
+      "detail": "no supply/ground mixing on any net",
+      "pass": true
+    },
+    {
+      "code": "E04",
+      "description": "no floating required pins",
+      "detail": "all required pins connected",
+      "pass": true
+    },
+    {
+      "code": "E10",
+      "description": "MCU pins carry required capabilities",
+      "detail": "all demanded capabilities present",
+      "pass": true
+    },
+    {
+      "code": "E11",
+      "description": "no MCU pin double-booked",
+      "detail": "all MCU pins single-purpose",
+      "pass": true
+    },
+    {
+      "code": "E20",
+      "description": "I2C addresses unique after reassignment plan",
+      "detail": "all bus addresses unique post-reassignment",
+      "pass": true
+    },
+    {
+      "code": "E21",
+      "description": "bus voltage-domain consistency",
+      "detail": "all bus devices in the master's voltage domain",
+      "pass": true
+    },
+    {
+      "code": "E40",
+      "description": "switch interrupts the main power path (tech-check)",
+      "detail": "battery positive reaches loads only through a switch",
+      "pass": true
+    },
+    {
+      "code": "E41",
+      "description": "failsafe stop chain declared and complete",
+      "detail": "stop chain complete: CRSF failsafe frames -> kernel commands neutral -> ESC S1/S2 driven to neutral by MCU; ESC self-cuts on signal loss",
+      "pass": true
+    }
+  ],
+  "netlist": "mvp-wedge-harness",
+  "netlist_hash": "2b91fbc4114978a404f688d0664fa85e6d8b49beb046f21980efea5bcb409a4b",
+  "pass": true,
+  "robowire_version": "0.1.0-m0"
+}

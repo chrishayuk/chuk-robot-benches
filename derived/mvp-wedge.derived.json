@@ -2,15 +2,15 @@
   "pipeline_version": "derive-v0.1.0-parametric",
   "schema_version": "robotspec-v0.1",
   "resolved_parts": {
-    "bbb-dual-esc": "a49f819e791508abe9a9b6e58728f267d99cfa32da4c92653b659b6b2b2e6c2f",
-    "elrs-rx": "9c8fa30ecf07d0fd24b422d1ff200ddd6cd5f15cd94fd95fc94c79f019beed6e",
+    "bbb-dual-esc": "720fe22b60d5e36cf9e4fd7cab9a53e483884eae33d89720af374834e690f5a0",
+    "elrs-rx": "de9500edc700675be68ce1e4da3871905d82628e923aed0ca8efb95d810fa2fe",
     "harness-allowance": "6687bc52a11f4f10b098bec86559c5bb261f247fe3cf84a709f7ea0190ec8769",
-    "imu-icm42688": "e240a35b73bd8238e3b7414efd4b2ff26097a39bb6817841b201118094cf4967",
-    "lipo-2s-260": "42a0dae25ee1e1532bd51d207ed4f423cfbf56af3e3faeef8da59638d1df7751",
-    "n20-motor-6v": "a56a3c259d3e8e7deab18c3fea24d31f3ee7db08ccbcc0547131527a3ae372bf",
-    "power-switch-slide": "79342a2965fb4806671abc3204ccd5452953025d4945791899af107eccea9f36",
-    "rp2350-zero": "30dcce989e722a22826f3fea28af708352d67cc809c788d81c483e2c1e7102bb",
-    "vl53l0x-breakout": "b189697ef05337218275bae9c13ca3c0640f7656782f800e17ab64796651e48d",
+    "imu-icm42688": "529cf56a7215a15ca715dfef976896159bfffa2607e08d6a9641bb211cf0e709",
+    "lipo-2s-260": "20a1dd2b560ef962ed9b3f93ae20acecac1910ec9a532cec7b55efc436d15aea",
+    "n20-motor-6v": "f64b55ea7e5bee35bea3fcdb8f2016376f217ce18e10cc9ce6ba2d3de5f221dd",
+    "power-switch-slide": "b781d4c6cc2c5882f485d041e2ab537deca96782087c9512a1d358f6e6630361",
+    "rp2350-zero": "21f15b8bcb3bfde1d2f89c67212992e1f3ad6510d29cdc98d1001b92fabfbc15",
+    "vl53l0x-breakout": "93583f7a8d8a062d6aedbfc01dbac66a61bdc48b7871e5fb97a3f59355975328",
     "wheel-32-foam": "fd4886009c8cfda2db9c4bc895672d8580df676d2ec73ee0ec56ed0639bb0639"
   },
   "mass_total_g": 100.93538198424494,
@@ -82,6 +82,6 @@
       "detail": "all mass/CoG/inertia/geometry quantities computed by this pipeline"
     }
   ],
-  "body_hash": "963b370cf1521f53b9baf0462813e3f25e23a24f4fae2613e479ccb34193a61c",
-  "robot_hash": "fd8c1eb12ddd354bb23af3df9ac30c1abb060e57f81239ffa27bca85b53231cd"
+  "body_hash": "e26cfbef71533ee8dbca3d6428b7622def01fb3ae02f9f46aca5aa52952783a3",
+  "robot_hash": "1da969839c7eb538b2009a349b09e9a5dd58570d0b5e29ed9f4650f2b2738c41"
 }

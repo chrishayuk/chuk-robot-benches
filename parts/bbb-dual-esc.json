@@ -3,5 +3,18 @@
   "kind": "esc",
   "mass_g": 5.0,
   "provisional": true,
-  "notes": "dual brushed ESC"
+  "notes": "dual brushed ESC with 5V BEC",
+  "elec": {
+    "pins": {
+      "VIN":   { "role": "power_in", "v_range": [6.0, 9.0], "required": true },
+      "GND":   { "role": "gnd", "required": true },
+      "BEC5V": { "role": "power_out", "volts": 5.0, "max_a": 1.0 },
+      "S1":    { "role": "signal_in", "signal": "pwm", "required": true },
+      "S2":    { "role": "signal_in", "signal": "pwm", "required": true },
+      "M1+":   { "role": "motor_out", "channel": "M1" },
+      "M1-":   { "role": "motor_out", "channel": "M1" },
+      "M2+":   { "role": "motor_out", "channel": "M2" },
+      "M2-":   { "role": "motor_out", "channel": "M2" }
+    }
+  }
 }

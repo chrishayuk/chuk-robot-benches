@@ -3,5 +3,11 @@
   "kind": "switch",
   "mass_g": 1.5,
   "provisional": true,
-  "notes": "main-path switch (tech-check E40)"
+  "notes": "main-path switch (tech-check E40)",
+  "elec": {
+    "pins": {
+      "in": { "role": "switch_in", "required": true },
+      "out": { "role": "switch_out", "required": true }
+    }
+  }
 }
