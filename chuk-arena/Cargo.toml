@@ -9,6 +9,7 @@ members = [
     "arena-bench",
     "arena-tourney",
     "arena-cli",
+    "arena-wasm",
 ]
 
 [workspace.package]

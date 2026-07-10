@@ -83,10 +83,21 @@ fn mu_at(i: u32, spec: &RigidBotSpec) -> f64 {
     spec.mu_min + (spec.mu_max - spec.mu_min) * (i as f64) / ((MU_STEPS - 1) as f64)
 }
 
+/// The naive (M0) kernel's certified stopping distance for the dynamic bot's
+/// equivalent parameters — the prediction §4.2 holds it to.
+pub fn naive_certified(spec: &RigidBotSpec, v: f64) -> f64 {
+    let a_motor = spec.wheels.len() as f64 * spec.motor.stall_force / spec.mass_kg;
+    let a_brake = a_motor.min(spec.mu_min * GRAVITY);
+    let v1 = (v + a_motor * arena_core::CONTROL_DT).min(spec.motor.no_load_speed);
+    v1 * v1 / (2.0 * a_brake) + v1 * arena_core::CONTROL_DT
+}
+
 /// Run one braking scenario; returns the maximum excursion along the initial
 /// velocity direction (the safety-relevant distance toward a hypothetical
-/// edge), in metres.
-fn run_brake_scenario(
+/// edge), in metres. If `trace_every_ticks > 0`, appends
+/// [t, x, y, heading, speed] samples to `sink` at that world-tick stride —
+/// this is the same code path the browser bench console drives via WASM.
+pub fn run_brake_traced(
     spec: &RigidBotSpec,
     kernel: BrakeKernel,
     cell: &ActiveBrakeCell,
@@ -94,6 +105,8 @@ fn run_brake_scenario(
     slip_rad: f64,
     mu: f64,
     omega0: f64,
+    trace_every_ticks: u64,
+    sink: &mut Vec<[f64; 5]>,
 ) -> f64 {
     let mut st = RigidState::at_rest_at(Vec2::ZERO, 0.0);
     st.vel = Vec2::new(v0 * slip_rad.cos(), v0 * slip_rad.sin());
@@ -118,6 +131,15 @@ fn run_brake_scenario(
                 }
             };
         }
+        if trace_every_ticks > 0 && tick % trace_every_ticks == 0 {
+            sink.push([
+                tick as f64 * WORLD_DT,
+                plant.state.pos.x,
+                plant.state.pos.y,
+                plant.state.heading,
+                plant.state.speed(),
+            ]);
+        }
         plant.step_world(cmd, mu, WORLD_DT);
         let excursion = plant.state.pos.dot(v_dir);
         if excursion > max_excursion {
@@ -127,23 +149,35 @@ fn run_brake_scenario(
             break;
         }
     }
+    if trace_every_ticks > 0 {
+        let t_final = sink.last().map_or(0.0, |s| s[0]) + trace_every_ticks as f64 * WORLD_DT;
+        sink.push([
+            t_final,
+            plant.state.pos.x,
+            plant.state.pos.y,
+            plant.state.heading,
+            plant.state.speed(),
+        ]);
+    }
     max_excursion
+}
+
+fn run_brake_scenario(
+    spec: &RigidBotSpec,
+    kernel: BrakeKernel,
+    cell: &ActiveBrakeCell,
+    v0: f64,
+    slip_rad: f64,
+    mu: f64,
+    omega0: f64,
+) -> f64 {
+    let mut no_trace = Vec::new();
+    run_brake_traced(spec, kernel, cell, v0, slip_rad, mu, omega0, 0, &mut no_trace)
 }
 
 pub fn envelope_bench(kernel: BrakeKernel) -> EnvelopeReport {
     let spec = RigidBotSpec::default_m1();
     let cell = ActiveBrakeCell::new(&spec);
-    // The naive kernel's certified prediction is the M0 formula evaluated
-    // with the dynamic bot's equivalent parameters.
-    let naive_a_motor =
-        spec.wheels.len() as f64 * spec.motor.stall_force / spec.mass_kg;
-    let naive_a_brake = naive_a_motor.min(spec.mu_min * GRAVITY);
-    let naive_cert = |v: f64| {
-        let v1 = (v + naive_a_motor * arena_core::CONTROL_DT)
-            .min(spec.motor.no_load_speed);
-        v1 * v1 / (2.0 * naive_a_brake) + v1 * arena_core::CONTROL_DT
-    };
-
     let mut samples = Vec::new();
     for &v0 in &V0_GRID {
         for &slip_deg in &SLIP_DEG_GRID {
@@ -153,7 +187,7 @@ pub fn envelope_bench(kernel: BrakeKernel) -> EnvelopeReport {
                     let certified = match kernel {
                         // The naive kernel doesn't model rotation at all —
                         // that's part of what makes it naive.
-                        BrakeKernel::NaiveCoast => naive_cert(v0),
+                        BrakeKernel::NaiveCoast => naive_certified(&spec, v0),
                         BrakeKernel::ActiveAligned => {
                             cell.certified_stop_distance(v0, omega0)
                         }

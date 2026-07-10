@@ -20,7 +20,8 @@ scope creep per SPEC §11.3.
 | `arena-store` | §9/arena-store | episode schema, sha256 episode identity, layer version tags in every record |
 | `arena-tourney` | §8 | serializable `EpisodeMachine`, failsafe-ablation experiment with Wilson CIs and corpus hash |
 | `arena-cli` | — | `arena run / fuzz / ablate` |
-| `arena-view/` | §2 arena-view | offline HTML replayer (not a crate): `render.py` splices episode logs into `template.html` — counterfactual-ghost view when given both arms of one seed |
+| `arena-wasm` | §7 (Q3 lean) | the real plant/cells/bench crates compiled to wasm32 for the browser bench console — fast-mode analog, same source as native |
+| `arena-view/` | §2 arena-view | offline HTML tooling (not a crate): `render.py` splices episode logs into the replayer `template.html`; `render_bench.py` embeds the wasm build into `bench-template.html` for the interactive bench console |
 
 ## Determinism (SPEC §2.1)
 
@@ -42,6 +43,10 @@ arena ablate --n 500 --seed 1   # M0 failsafe ablation report (JSON)
 arena replay --seed 42          # render both arms to HTML and open in browser
 arena bench envelope            # §4.2 conservatism report, both brake kernels
 arena bench dyno                # §4.1 speed/thrust/braking/sag table
+
+# interactive bench console (tweak scenario + design vector live in the browser)
+cargo build --release --target wasm32-unknown-unknown -p arena-wasm
+python3 arena-view/render_bench.py -o bench.html
 ```
 
 `arena replay` runs both arms of a seed (failsafe on + off), splices them into

@@ -1,0 +1,12 @@
+[package]
+name = "arena-wasm"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+arena-bench = { path = "../arena-bench" }
+arena-cells = { path = "../arena-cells" }
+arena-plant = { path = "../arena-plant" }
