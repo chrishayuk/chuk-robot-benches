@@ -1,0 +1,14 @@
+[package]
+name = "arena-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "arena"
+path = "src/main.rs"
+
+[dependencies]
+arena-cells = { path = "../arena-cells" }
+arena-store = { path = "../arena-store" }
+arena-tourney = { path = "../arena-tourney" }
+serde_json = { workspace = true }

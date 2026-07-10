@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+    "arena-core",
+    "arena-plant",
+    "arena-agents",
+    "arena-cells",
+    "arena-store",
+    "arena-tourney",
+    "arena-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+# float_roundtrip is load-bearing: the §2.1 serialize-roundtrip determinism
+# leg requires bit-exact f64 parsing, which serde_json's default parser trades
+# away for speed.
+serde_json = { version = "1", features = ["float_roundtrip"] }
+sha2 = "0.10"
+
+[profile.release]
+lto = "thin"

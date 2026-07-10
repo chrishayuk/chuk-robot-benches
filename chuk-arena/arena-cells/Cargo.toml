@@ -1,0 +1,9 @@
+[package]
+name = "arena-cells"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+arena-core = { path = "../arena-core" }
+arena-plant = { path = "../arena-plant" }
+serde = { workspace = true }

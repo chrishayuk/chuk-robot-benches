@@ -1,0 +1,8 @@
+[package]
+name = "arena-plant"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+arena-core = { path = "../arena-core" }
+serde = { workspace = true }

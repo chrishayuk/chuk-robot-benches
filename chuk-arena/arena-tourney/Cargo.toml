@@ -1,0 +1,13 @@
+[package]
+name = "arena-tourney"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+arena-core = { path = "../arena-core" }
+arena-plant = { path = "../arena-plant" }
+arena-agents = { path = "../arena-agents" }
+arena-cells = { path = "../arena-cells" }
+arena-store = { path = "../arena-store" }
+serde = { workspace = true }
+serde_json = { workspace = true }

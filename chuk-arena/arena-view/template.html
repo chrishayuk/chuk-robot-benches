@@ -1,0 +1,585 @@
+<title>chuk-arena replay</title>
+<style>
+  :root {
+    --bg: #101417; --panel: #171d21; --panel2: #1d2429; --line: #2a3339;
+    --ink: #e6e9e4; --dim: #8b969b; --accent: #e8a33d; --accent-ink: #14100a;
+    --danger: #e05c50; --safe: #57b48f;
+    --floor: #151b1f; --void: #0a0d0f; --grid: #1e262b; --bot: #dfe5df;
+    --focus: #e8a33d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #e9ebe7; --panel: #f3f4f1; --panel2: #eceeea; --line: #cdd3ce;
+      --ink: #1a2125; --dim: #5c686d; --accent: #b97a1e; --accent-ink: #fdf9f2;
+      --danger: #bc4437; --safe: #2e7d5e;
+      --floor: #dfe3dc; --void: #b3bab4; --grid: #d2d7d1; --bot: #293237;
+      --focus: #b97a1e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101417; --panel: #171d21; --panel2: #1d2429; --line: #2a3339;
+    --ink: #e6e9e4; --dim: #8b969b; --accent: #e8a33d; --accent-ink: #14100a;
+    --danger: #e05c50; --safe: #57b48f;
+    --floor: #151b1f; --void: #0a0d0f; --grid: #1e262b; --bot: #dfe5df;
+    --focus: #e8a33d;
+  }
+  :root[data-theme="light"] {
+    --bg: #e9ebe7; --panel: #f3f4f1; --panel2: #eceeea; --line: #cdd3ce;
+    --ink: #1a2125; --dim: #5c686d; --accent: #b97a1e; --accent-ink: #fdf9f2;
+    --danger: #bc4437; --safe: #2e7d5e;
+    --floor: #dfe3dc; --void: #b3bab4; --grid: #d2d7d1; --bot: #293237;
+    --focus: #b97a1e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    padding: 20px 20px 48px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+  .cond { font-family: "Avenir Next Condensed", "Helvetica Neue Condensed", "Arial Narrow", sans-serif; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  header h1 { margin: 0; font-size: 26px; letter-spacing: 0.14em; font-weight: 600; text-transform: uppercase; }
+  header h1 .amber { color: var(--accent); }
+  .eyebrow { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); }
+  header p { flex-basis: 100%; margin: 4px 0 0; color: var(--dim); max-width: 62ch; text-wrap: pretty; }
+
+  .controls { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; }
+  .ctl-group { display: flex; flex-direction: column; gap: 5px; }
+  .ctl-label { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .seg button {
+    appearance: none; border: none; background: var(--panel); color: var(--ink);
+    font: 13px ui-monospace, "SF Mono", Menlo, monospace; padding: 7px 14px; cursor: pointer;
+    border-right: 1px solid var(--line);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .seg button:focus-visible, .tbtn:focus-visible, .ghost-toggle input:focus-visible + span {
+    outline: 2px solid var(--focus); outline-offset: -2px;
+  }
+  .ghost-toggle { display: flex; align-items: center; gap: 8px; padding: 7px 0; cursor: pointer; user-select: none; }
+  .ghost-toggle input { position: absolute; opacity: 0; }
+  .ghost-toggle .box {
+    width: 15px; height: 15px; border: 1px solid var(--line); border-radius: 3px; display: inline-block;
+    background: var(--panel); position: relative; flex-shrink: 0;
+  }
+  .ghost-toggle input:checked + .box { background: var(--danger); border-color: var(--danger); }
+  .ghost-toggle input:checked + .box::after {
+    content: ""; position: absolute; inset: 3px; border-radius: 1px; background: var(--bg);
+    clip-path: polygon(14% 44%, 40% 70%, 86% 18%, 100% 32%, 40% 100%, 0 58%);
+    background: #fff;
+  }
+  .ghost-toggle input:focus-visible + .box { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .ghost-toggle .txt { font-size: 13px; color: var(--dim); }
+
+  .stage { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(230px, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .stage { grid-template-columns: 1fr; } }
+
+  .arena-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; }
+  #arena { display: block; width: 100%; height: auto; border-radius: 3px; }
+
+  .rail { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+  .card h2 { margin: 0 0 8px; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  .bignum { font-size: 30px; line-height: 1.1; font-weight: 500; }
+  .unit { font-size: 13px; color: var(--dim); margin-left: 4px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .bar { height: 5px; background: var(--panel2); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; border-radius: 3px; }
+  .bar.edge i { background: var(--safe); }
+
+  .lamp { display: flex; align-items: center; gap: 9px; }
+  .lamp .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
+  .lamp.armed .dot { background: var(--safe); }
+  .lamp.veto .dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .lamp.off .dot { background: var(--danger); }
+  .lamp.dead .dot { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
+  .lamp .txt { font-size: 15px; font-weight: 600; letter-spacing: 0.06em; }
+
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 13px; }
+  .kv dt { color: var(--dim); margin: 0; }
+  .kv dd { margin: 0; text-align: right; }
+
+  .ghost-line { color: var(--danger); font-size: 13px; }
+
+  .transport { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .tbtn {
+    appearance: none; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    border-radius: 4px; padding: 8px 16px; cursor: pointer;
+    font: 13px ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.08em;
+  }
+  .tbtn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; min-width: 92px; }
+  #timeline { display: block; width: 100%; height: 56px; cursor: pointer; border-radius: 4px; }
+  .tl-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px 6px; }
+  .tl-legend { display: flex; gap: 18px; font-size: 12px; color: var(--dim); padding: 6px 2px 2px; flex-wrap: wrap; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 12px; color: var(--dim); font-size: 12.5px; }
+  footer .mono { font-size: 12px; }
+  footer p { margin: 4px 0; max-width: 78ch; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lamp .dot { box-shadow: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow cond">chuk-arena · M0 · edge bench §4.5</span>
+    <h1 class="cond">Proving <span class="amber">Ground</span> Replay</h1>
+    <p>One seed, one driver, same blunders every run. The only difference between the solid bot
+       and its ghost is whether the edge-failsafe kernel may veto a command. Deterministic:
+       same seed &rArr; same replay, byte for byte.</p>
+  </header>
+
+  <div class="controls">
+    <div class="ctl-group">
+      <span class="ctl-label cond">Episode seed</span>
+      <div class="seg" id="seedSeg" role="group" aria-label="Episode seed"></div>
+    </div>
+    <div class="ctl-group">
+      <span class="ctl-label cond">Watching</span>
+      <div class="seg" id="armSeg" role="group" aria-label="Kernel arm">
+        <button data-arm="on" aria-pressed="true">FAILSAFE ON</button>
+        <button data-arm="off" aria-pressed="false">FAILSAFE OFF</button>
+      </div>
+    </div>
+    <div class="ctl-group">
+      <span class="ctl-label cond">Counterfactual</span>
+      <label class="ghost-toggle">
+        <input type="checkbox" id="ghostChk" checked>
+        <span class="box"></span>
+        <span class="txt">show the other arm as a ghost</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="arena-panel">
+      <canvas id="arena" width="640" height="640" aria-label="Top-down arena replay"></canvas>
+    </div>
+    <div class="rail">
+      <div class="card">
+        <h2 class="cond">Failsafe</h2>
+        <div class="lamp" id="lamp"><span class="dot"></span><span class="txt mono" id="lampTxt">ARMED</span></div>
+        <div class="row" style="margin-top:8px">
+          <span style="color:var(--dim);font-size:13px">vetoes so far</span>
+          <span class="mono" id="vetoCount">0</span>
+        </div>
+      </div>
+      <div class="card">
+        <h2 class="cond">Telemetry</h2>
+        <div class="row"><span class="bignum mono" id="tClock">T+00.00</span></div>
+        <div class="row" style="margin-top:10px">
+          <span style="color:var(--dim);font-size:13px">speed</span>
+          <span class="mono" id="speedVal">0.00 <span class="unit">m/s</span></span>
+        </div>
+        <div class="bar"><i id="speedBar"></i></div>
+        <div class="row" style="margin-top:10px">
+          <span style="color:var(--dim);font-size:13px">CoG &rarr; edge</span>
+          <span class="mono" id="edgeVal">0.450 <span class="unit">m</span></span>
+        </div>
+        <div class="bar edge"><i id="edgeBar"></i></div>
+        <div class="ghost-line" id="ghostStatus" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h2 class="cond">Episode draw</h2>
+        <dl class="kv mono" id="drawKv"></dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="tl-panel">
+    <canvas id="timeline" aria-label="Timeline scrubber"></canvas>
+    <div class="tl-legend cond">
+      <span><span class="swatch" style="background:var(--accent)"></span>KERNEL VETO WINDOW</span>
+      <span><span class="swatch" style="background:var(--danger)"></span>EDGE OUT</span>
+      <span style="margin-left:auto">SPACE&thinsp;=&thinsp;PLAY&ensp;&larr;/&rarr;&thinsp;=&thinsp;SCRUB 1S</span>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button class="tbtn primary" id="playBtn">&#9654; PLAY</button>
+    <button class="tbtn" id="restartBtn">&#8635; RESTART</button>
+    <div class="seg" id="speedSeg" role="group" aria-label="Playback speed">
+      <button data-speed="0.5" aria-pressed="false">0.5&times;</button>
+      <button data-speed="1" aria-pressed="true">1&times;</button>
+      <button data-speed="2" aria-pressed="false">2&times;</button>
+      <button data-speed="4" aria-pressed="false">4&times;</button>
+    </div>
+  </div>
+
+  <footer>
+    <p><strong>Provenance.</strong> Episodes generated by <span class="mono">arena run --seed &lt;s&gt; [--no-kernel] --duration 45</span>,
+       replayed from 50&thinsp;Hz state samples of the 8&thinsp;kHz world. Kernel is the M0 native-placeholder
+       edge failsafe (provisional per SPEC &sect;7 until the executor differential job stands).</p>
+    <p class="mono">core 0.1.0-m0 &middot; plant 0.1.0-m0-kinematic &middot; agents 0.1.0-m0 &middot; cells 0.1.0-m0-native-placeholder &middot; store 0.1.0-m0 &middot; tourney 0.1.0-m0</p>
+  </footer>
+</div>
+
+<script>
+const DATA =
+//__DATA__
+[];
+
+(function () {
+  "use strict";
+
+  // ---- data indexing ---------------------------------------------------
+  const bySeed = {};
+  for (const ep of DATA) {
+    (bySeed[ep.seed] ||= {})[ep.kernel ? "on" : "off"] = ep;
+    ep.end = ep.samples.length ? ep.samples[ep.samples.length - 1][0] : 0;
+    ep.edgeOut = ep.outcome.kind === "EdgeOut" ? ep.outcome.t : null;
+    if (ep.edgeOut !== null) ep.end = ep.edgeOut;
+    ep.windows = [];
+    let openT = null;
+    for (const e of ep.events) {
+      if (e.k === "InterventionStart") openT = e.t;
+      else if (e.k === "InterventionEnd" && openT !== null) { ep.windows.push([openT, e.t]); openT = null; }
+    }
+    if (openT !== null) ep.windows.push([openT, ep.end]);
+  }
+  const seeds = Object.keys(bySeed).map(Number).sort((a, b) => a - b);
+
+  // ---- state -----------------------------------------------------------
+  const st = { seed: seeds[seeds.length - 1], arm: "on", ghost: true, t: 0, playing: false, speed: 1 };
+  const mainEp = () => bySeed[st.seed][st.arm];
+  const ghostEp = () => bySeed[st.seed][st.arm === "on" ? "off" : "on"];
+  const duration = () => Math.max(mainEp().end, st.ghost ? ghostEp().end : 0);
+
+  // ---- theme tokens ----------------------------------------------------
+  let C = {};
+  function readTokens() {
+    const s = getComputedStyle(document.documentElement);
+    C = {};
+    for (const k of ["bg","panel","panel2","line","ink","dim","accent","danger","safe","floor","void","grid","bot"])
+      C[k] = s.getPropertyValue("--" + k).trim();
+  }
+  readTokens();
+  new MutationObserver(readTokens).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => setTimeout(readTokens, 0));
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- sampling --------------------------------------------------------
+  function sampleAt(ep, t) {
+    const s = ep.samples;
+    if (!s.length) return null;
+    if (t <= s[0][0]) return { x: s[0][1], y: s[0][2], h: s[0][3], v: s[0][4] };
+    const last = s[s.length - 1];
+    if (t >= last[0]) return { x: last[1], y: last[2], h: last[3], v: last[4] };
+    let lo = 0, hi = s.length - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (s[mid][0] <= t) lo = mid; else hi = mid; }
+    const a = s[lo], b = s[hi], f = (t - a[0]) / (b[0] - a[0]);
+    return { x: a[1] + f * (b[1] - a[1]), y: a[2] + f * (b[2] - a[2]),
+             h: a[3] + f * (b[3] - a[3]), v: a[4] + f * (b[4] - a[4]) };
+  }
+  const inVeto = (ep, t) => ep.windows.some(w => t >= w[0] && t <= w[1]);
+  const vetoesSoFar = (ep, t) => ep.windows.filter(w => w[0] <= t).length;
+
+  // ---- arena canvas ------------------------------------------------------
+  const cv = document.getElementById("arena");
+  const cx = cv.getContext("2d");
+  let px = 640, scale = 1, dpr = 1;
+  function resizeArena() {
+    const w = cv.clientWidth || 640;
+    dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(w * dpr);
+    px = cv.width;
+    scale = px / 1.1; // world spans [-0.55, 0.55]
+  }
+  const W2X = wx => px / 2 + wx * scale;
+  const W2Y = wy => px / 2 - wy * scale;
+
+  function drawBot(ep, s, opts) {
+    const { w, l } = ep.bot;
+    cx.save();
+    cx.translate(W2X(s.x), W2Y(s.y));
+    cx.rotate(-s.h + (opts.spin || 0));
+    cx.globalAlpha = opts.alpha;
+    const sc = (opts.scale || 1) * scale;
+    cx.beginPath();
+    cx.rect(-l * sc, -w * sc, 2 * l * sc, 2 * w * sc);
+    if (opts.fill) { cx.fillStyle = opts.fill; cx.fill(); }
+    cx.lineWidth = Math.max(1.5, 0.006 * scale);
+    cx.strokeStyle = opts.stroke;
+    cx.stroke();
+    // heading notch
+    cx.beginPath();
+    cx.moveTo(l * sc, 0);
+    cx.lineTo(l * sc * 0.45, -w * sc * 0.5);
+    cx.lineTo(l * sc * 0.45, w * sc * 0.5);
+    cx.closePath();
+    cx.fillStyle = opts.stroke;
+    cx.fill();
+    if (opts.veto) {
+      cx.beginPath();
+      cx.arc(0, 0, Math.max(l, w) * sc * 1.7, 0, Math.PI * 2);
+      cx.strokeStyle = C.accent;
+      cx.lineWidth = Math.max(1.5, 0.008 * scale);
+      cx.stroke();
+    }
+    cx.restore();
+  }
+
+  function drawTrail(ep, t, color, alpha) {
+    const s = ep.samples;
+    cx.beginPath();
+    let started = false;
+    for (const smp of s) {
+      if (smp[0] > t) break;
+      if (smp[0] < t - 3) continue;
+      const X = W2X(smp[1]), Y = W2Y(smp[2]);
+      if (!started) { cx.moveTo(X, Y); started = true; } else cx.lineTo(X, Y);
+    }
+    if (!started) return;
+    cx.strokeStyle = color;
+    cx.globalAlpha = alpha;
+    cx.lineWidth = Math.max(1, 0.004 * scale);
+    cx.stroke();
+    cx.globalAlpha = 1;
+  }
+
+  function renderArena() {
+    const ep = mainEp(), gp = st.ghost ? ghostEp() : null;
+    const he = ep.arena;
+    cx.clearRect(0, 0, px, px);
+    // the void beyond the edge
+    cx.fillStyle = C.void;
+    cx.fillRect(0, 0, px, px);
+    // floor
+    const e0 = W2X(-he), e1 = W2X(he);
+    cx.fillStyle = C.floor;
+    cx.fillRect(e0, W2Y(he), e1 - e0, e1 - e0);
+    // grid every 0.15 m
+    cx.strokeStyle = C.grid;
+    cx.lineWidth = 1;
+    for (let g = -0.45; g <= 0.451; g += 0.15) {
+      cx.beginPath(); cx.moveTo(W2X(g), W2Y(-he)); cx.lineTo(W2X(g), W2Y(he)); cx.stroke();
+      cx.beginPath(); cx.moveTo(W2X(-he), W2Y(g)); cx.lineTo(W2X(he), W2Y(g)); cx.stroke();
+    }
+    // certified CoG limit (reach band), dashed
+    const reach = Math.hypot(ep.bot.w, ep.bot.l) + 0.02;
+    const r0 = he - reach;
+    cx.setLineDash([6, 5]);
+    cx.strokeStyle = C.accent;
+    cx.globalAlpha = 0.5;
+    cx.strokeRect(W2X(-r0), W2Y(r0), 2 * r0 * scale, 2 * r0 * scale);
+    cx.globalAlpha = 1;
+    cx.setLineDash([]);
+    // edge
+    cx.strokeStyle = C.line;
+    cx.lineWidth = Math.max(2, 0.008 * scale);
+    cx.strokeRect(e0, W2Y(he), e1 - e0, e1 - e0);
+
+    // ghost first (under main)
+    if (gp) {
+      drawTrail(gp, st.t, C.danger, 0.4);
+      const gs = sampleAt(gp, Math.min(st.t, gp.end));
+      if (gs) {
+        if (gp.edgeOut !== null && st.t > gp.edgeOut) {
+          const dt = st.t - gp.edgeOut, f = Math.min(dt / 0.6, 1);
+          if (f < 1) {
+            drawBot(gp, gs, { alpha: 0.55 * (1 - f), stroke: C.danger,
+                              scale: 1 - 0.4 * f, spin: reducedMotion ? 0 : f * 1.2 });
+          }
+          // crash marker
+          const X = W2X(gs.x), Y = W2Y(gs.y), m = 0.018 * scale;
+          cx.strokeStyle = C.danger; cx.lineWidth = Math.max(2, 0.005 * scale);
+          cx.beginPath();
+          cx.moveTo(X - m, Y - m); cx.lineTo(X + m, Y + m);
+          cx.moveTo(X - m, Y + m); cx.lineTo(X + m, Y - m);
+          cx.stroke();
+        } else {
+          drawBot(gp, gs, { alpha: 0.55, stroke: C.danger, veto: inVeto(gp, st.t) });
+        }
+      }
+    }
+
+    // main bot
+    drawTrail(ep, st.t, C.accent, 0.65);
+    const ms = sampleAt(ep, Math.min(st.t, ep.end));
+    if (ms) {
+      if (ep.edgeOut !== null && st.t > ep.edgeOut) {
+        const dt = st.t - ep.edgeOut, f = Math.min(dt / 0.6, 1);
+        if (f < 1) drawBot(ep, ms, { alpha: 1 - f, fill: C.panel2, stroke: C.danger,
+                                     scale: 1 - 0.4 * f, spin: reducedMotion ? 0 : f * 1.2 });
+        const X = W2X(ms.x), Y = W2Y(ms.y), m = 0.02 * scale;
+        cx.strokeStyle = C.danger; cx.lineWidth = Math.max(2.5, 0.006 * scale);
+        cx.beginPath();
+        cx.moveTo(X - m, Y - m); cx.lineTo(X + m, Y + m);
+        cx.moveTo(X - m, Y + m); cx.lineTo(X + m, Y - m);
+        cx.stroke();
+      } else {
+        drawBot(ep, ms, { alpha: 1, fill: C.panel2, stroke: C.bot, veto: inVeto(ep, st.t) });
+      }
+    }
+  }
+
+  // ---- timeline ----------------------------------------------------------
+  const tl = document.getElementById("timeline");
+  const tx = tl.getContext("2d");
+  function resizeTimeline() {
+    const w = tl.clientWidth || 800;
+    tl.width = Math.round(w * dpr); tl.height = Math.round(56 * dpr);
+  }
+  function renderTimeline() {
+    const W = tl.width, H = tl.height, dur = duration();
+    const T2X = t => (t / dur) * W;
+    tx.clearRect(0, 0, W, H);
+    tx.fillStyle = C.panel2;
+    tx.fillRect(0, 0, W, H);
+    const ep = mainEp(), gp = st.ghost ? ghostEp() : null;
+    // veto windows from whichever arm has the kernel
+    const onEp = bySeed[st.seed].on;
+    tx.fillStyle = C.accent;
+    tx.globalAlpha = 0.75;
+    for (const w of onEp.windows) tx.fillRect(T2X(w[0]), H * 0.2, Math.max(1, T2X(w[1]) - T2X(w[0])), H * 0.6);
+    tx.globalAlpha = 1;
+    // edge-out ticks
+    for (const e of [ep, gp]) {
+      if (e && e.edgeOut !== null) {
+        tx.fillStyle = C.danger;
+        tx.fillRect(T2X(e.edgeOut) - 1.5 * dpr, 0, 3 * dpr, H);
+      }
+    }
+    // second ruler
+    tx.strokeStyle = C.line;
+    tx.lineWidth = 1;
+    tx.fillStyle = C.dim;
+    tx.font = `${10 * dpr}px ui-monospace, Menlo, monospace`;
+    for (let s = 0; s <= dur; s += 5) {
+      const X = T2X(s);
+      tx.beginPath(); tx.moveTo(X, H - 8 * dpr); tx.lineTo(X, H); tx.stroke();
+      if (s > 0 && s < dur - 2) tx.fillText(s + "s", X + 3 * dpr, H - 3 * dpr);
+    }
+    // playhead
+    tx.fillStyle = C.ink;
+    tx.fillRect(T2X(st.t) - 1 * dpr, 0, 2 * dpr, H);
+  }
+
+  // ---- rail readouts -----------------------------------------------------
+  const $ = id => document.getElementById(id);
+  const lamp = $("lamp"), lampTxt = $("lampTxt");
+  function renderRail() {
+    const ep = mainEp();
+    const s = sampleAt(ep, Math.min(st.t, ep.end));
+    const dead = ep.edgeOut !== null && st.t >= ep.edgeOut;
+    $("tClock").textContent = "T+" + st.t.toFixed(2).padStart(5, "0");
+    const v = dead || !s ? 0 : Math.abs(s.v);
+    $("speedVal").innerHTML = v.toFixed(2) + ' <span class="unit">m/s</span>';
+    $("speedBar").style.width = Math.min(100, v / 1.5 * 100) + "%";
+    const edist = dead || !s ? 0 : Math.max(0, ep.arena - Math.max(Math.abs(s.x), Math.abs(s.y)));
+    $("edgeVal").innerHTML = edist.toFixed(3) + ' <span class="unit">m</span>';
+    const eb = $("edgeBar");
+    eb.style.width = Math.min(100, edist / ep.arena * 100) + "%";
+    eb.style.background = edist < 0.12 ? (edist < 0.095 ? C.danger : C.accent) : C.safe;
+
+    lamp.className = "lamp";
+    if (dead) { lamp.classList.add("dead"); lampTxt.textContent = "EDGE OUT @ " + ep.edgeOut.toFixed(2) + "s"; lampTxt.style.color = C.danger; }
+    else if (!ep.kernel) { lamp.classList.add("off"); lampTxt.textContent = "DISABLED"; lampTxt.style.color = C.danger; }
+    else if (inVeto(ep, st.t)) { lamp.classList.add("veto"); lampTxt.textContent = "VETOING"; lampTxt.style.color = C.accent; }
+    else { lamp.classList.add("armed"); lampTxt.textContent = "ARMED"; lampTxt.style.color = ""; }
+    $("vetoCount").textContent = ep.kernel ? vetoesSoFar(ep, st.t) : "—";
+
+    const gp = st.ghost ? ghostEp() : null;
+    const gs = $("ghostStatus");
+    if (!gp) gs.textContent = "";
+    else if (gp.edgeOut !== null && st.t >= gp.edgeOut)
+      gs.textContent = "ghost (" + (gp.kernel ? "failsafe on" : "failsafe off") + "): edge out @ " + gp.edgeOut.toFixed(2) + "s";
+    else gs.textContent = "ghost (" + (gp.kernel ? "failsafe on" : "failsafe off") + "): running";
+  }
+
+  function renderDraw() {
+    const ep = mainEp();
+    $("drawKv").innerHTML =
+      "<dt>seed</dt><dd>" + ep.seed + "</dd>" +
+      "<dt>&mu; (this floor)</dt><dd>" + ep.mu.toFixed(3) + "</dd>" +
+      "<dt>driver latency</dt><dd>" + Math.round(ep.driver.lat * 1000) + " ms</dd>" +
+      "<dt>aggression</dt><dd>" + ep.driver.agg.toFixed(2) + "</dd>" +
+      "<dt>outcome</dt><dd>" + (ep.edgeOut !== null ? "EDGE OUT @ " + ep.edgeOut.toFixed(2) + "s" : "SURVIVED 45s") + "</dd>" +
+      "<dt>vetoes total</dt><dd>" + (ep.kernel ? ep.interventions : "—") + "</dd>" +
+      "<dt>min CoG&rarr;edge</dt><dd>" + ep.minEdge.toFixed(4) + " m</dd>";
+  }
+
+  // ---- render loop -------------------------------------------------------
+  function renderAll() { renderArena(); renderTimeline(); renderRail(); }
+  let lastFrame = null;
+  function frame(now) {
+    if (!st.playing) { lastFrame = null; return; }
+    if (lastFrame !== null) {
+      st.t += ((now - lastFrame) / 1000) * st.speed;
+      const dur = duration();
+      if (st.t >= dur + 0.8) { st.t = dur + 0.8; setPlaying(false); }
+    }
+    lastFrame = now;
+    renderAll();
+    if (st.playing) requestAnimationFrame(frame);
+  }
+  function setPlaying(p) {
+    if (p && st.t >= duration()) st.t = 0;
+    st.playing = p;
+    $("playBtn").innerHTML = p ? "&#10073;&#10073; PAUSE" : "&#9654; PLAY";
+    if (p) requestAnimationFrame(frame);
+    else renderAll();
+  }
+
+  // ---- controls ----------------------------------------------------------
+  const seedSeg = $("seedSeg");
+  for (const s of seeds) {
+    const b = document.createElement("button");
+    b.textContent = s;
+    b.setAttribute("aria-pressed", String(s === st.seed));
+    b.addEventListener("click", () => {
+      st.seed = s; st.t = 0;
+      for (const btn of seedSeg.children) btn.setAttribute("aria-pressed", String(Number(btn.textContent) === s));
+      renderDraw(); renderAll();
+    });
+    seedSeg.appendChild(b);
+  }
+  for (const b of $("armSeg").children) {
+    b.addEventListener("click", () => {
+      st.arm = b.dataset.arm; st.t = 0;
+      for (const x of $("armSeg").children) x.setAttribute("aria-pressed", String(x === b));
+      renderDraw(); renderAll();
+    });
+  }
+  $("ghostChk").addEventListener("change", e => { st.ghost = e.target.checked; renderAll(); });
+  $("playBtn").addEventListener("click", () => setPlaying(!st.playing));
+  $("restartBtn").addEventListener("click", () => { st.t = 0; renderAll(); if (!st.playing) setPlaying(true); });
+  for (const b of $("speedSeg").children) {
+    b.addEventListener("click", () => {
+      st.speed = Number(b.dataset.speed);
+      for (const x of $("speedSeg").children) x.setAttribute("aria-pressed", String(x === b));
+    });
+  }
+  function scrubTo(clientX) {
+    const r = tl.getBoundingClientRect();
+    st.t = Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * duration();
+    renderAll();
+  }
+  let scrubbing = false;
+  tl.addEventListener("pointerdown", e => { scrubbing = true; tl.setPointerCapture(e.pointerId); scrubTo(e.clientX); });
+  tl.addEventListener("pointermove", e => { if (scrubbing) scrubTo(e.clientX); });
+  tl.addEventListener("pointerup", () => { scrubbing = false; });
+  window.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") return;
+    if (e.code === "Space") { e.preventDefault(); setPlaying(!st.playing); }
+    else if (e.code === "ArrowRight") { st.t = Math.min(duration(), st.t + 1); renderAll(); }
+    else if (e.code === "ArrowLeft") { st.t = Math.max(0, st.t - 1); renderAll(); }
+  });
+
+  // ---- boot ----------------------------------------------------------------
+  function layout() { resizeArena(); resizeTimeline(); renderAll(); }
+  window.addEventListener("resize", layout);
+  new MutationObserver(() => renderAll()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  renderDraw();
+  layout();
+  setPlaying(true);
+})();
+</script>
