@@ -12,6 +12,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "arena-bench"
+version = "0.1.0"
+dependencies = [
+ "arena-cells",
+ "arena-core",
+ "arena-plant",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "arena-cells"
 version = "0.1.0"
 dependencies = [
@@ -24,6 +35,7 @@ dependencies = [
 name = "arena-cli"
 version = "0.1.0"
 dependencies = [
+ "arena-bench",
  "arena-cells",
  "arena-store",
  "arena-tourney",

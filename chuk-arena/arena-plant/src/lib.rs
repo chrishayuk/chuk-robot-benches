@@ -5,6 +5,10 @@
 use arena_core::{Vec2, GRAVITY};
 use serde::{Deserialize, Serialize};
 
+pub mod dynamic;
+
+/// Version of the M0 kinematic path — unchanged so the banked M0 corpus
+/// stays reproducible; the dynamic model carries DYNAMIC_PLANT_VERSION.
 pub const ARENA_PLANT_VERSION: &str = "0.1.0-m0-kinematic";
 
 /// The design vector (SPEC §3), M0 subset. Everything sweepable lives here.

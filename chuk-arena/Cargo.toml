@@ -6,6 +6,7 @@ members = [
     "arena-agents",
     "arena-cells",
     "arena-store",
+    "arena-bench",
     "arena-tourney",
     "arena-cli",
 ]

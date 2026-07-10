@@ -3,6 +3,7 @@
 //!   arena replay [--seed N] [--duration S] [--out F]  render + open visual replay
 //!   arena fuzz [--seeds N]                            in-process determinism fuzz
 //!   arena ablate [--n N] [--seed S] [--duration S]    failsafe ablation report
+//!   arena bench <envelope|dyno> [--out F]             virtual benches (§4.1/§4.2)
 
 use arena_cells::EdgeFailsafeParams;
 use arena_tourney::{experiments, m0_config, run_episode, EpisodeMachine};
@@ -192,6 +193,46 @@ fn cmd_ablate(args: &[String]) {
     println!("{}", serde_json::to_string_pretty(&report).unwrap());
 }
 
+fn cmd_bench(args: &[String]) {
+    let json = match args.first().map(|s| s.as_str()) {
+        Some("envelope") => {
+            let naive = arena_bench::envelope_bench(arena_bench::BrakeKernel::NaiveCoast);
+            let active =
+                arena_bench::envelope_bench(arena_bench::BrakeKernel::ActiveAligned);
+            eprintln!(
+                "naive-coast:    {} (min margin {:+.4} m over {} samples)",
+                naive.verdict, naive.min_margin_m, naive.samples
+            );
+            eprintln!(
+                "active-aligned: {} (min margin {:+.4} m over {} samples)",
+                active.verdict, active.min_margin_m, active.samples
+            );
+            serde_json::to_string_pretty(&serde_json::json!({
+                "bench": "envelope-4.2",
+                "naive_coast": naive,
+                "active_aligned": active,
+            }))
+            .unwrap()
+        }
+        Some("dyno") => {
+            let report = arena_bench::dyno_bench();
+            serde_json::to_string_pretty(&serde_json::json!({
+                "bench": "dyno-4.1",
+                "report": report,
+            }))
+            .unwrap()
+        }
+        _ => die("usage: arena bench <envelope|dyno> [--out F]"),
+    };
+    if let Some(path) = flag_value(args, "--out") {
+        std::fs::write(&path, &json)
+            .unwrap_or_else(|e| die(&format!("writing {path}: {e}")));
+        println!("wrote {path}");
+    } else {
+        println!("{json}");
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(|s| s.as_str()) {
@@ -199,8 +240,9 @@ fn main() {
         Some("replay") => cmd_replay(&args[1..]),
         Some("fuzz") => cmd_fuzz(&args[1..]),
         Some("ablate") => cmd_ablate(&args[1..]),
+        Some("bench") => cmd_bench(&args[1..]),
         _ => {
-            eprintln!("usage: arena <run|replay|fuzz|ablate> [flags]");
+            eprintln!("usage: arena <run|replay|fuzz|ablate|bench> [flags]");
             std::process::exit(2);
         }
     }

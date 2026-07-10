@@ -1,7 +1,8 @@
 # chuk-arena — the proving ground
 
 Deterministic virtual physics test environment for the robot programme.
-Full design: [SPEC.md](SPEC.md). Status: **M0 in progress** (SPEC §10).
+Full design: [SPEC.md](SPEC.md). Status: **M0 done, M1 in progress** (SPEC §10);
+Rapier differential rig (§2.3) is the open M1 item.
 
 ## Layout
 
@@ -12,9 +13,10 @@ scope creep per SPEC §11.3.
 | crate | SPEC layer | M0 scope |
 |---|---|---|
 | `arena-core` | §2 arena-core | 8kHz world / 1kHz control clock, owned xoshiro256++ PRNG with domain-separated substreams, square edge-out geometry |
-| `arena-plant` | §3 | kinematic differential-drive plant, traction-circle accel limit, `BotSpec` design vector (M0 subset, datasheet-provisional baseline) |
+| `arena-plant` | §3 | M0 kinematic plant (frozen — banked corpus) + M1 dynamic plant: per-wheel friction circles with longitudinal priority, DC motor curves with back-EMF braking, battery sag, rolling resistance |
 | `arena-agents` | §5.1 | humanlike driver: latency queue, aim noise, waypoint chase, full-stick-toward-edge blunders sampled from the seed |
-| `arena-cells` | §7 | **native placeholder** edge-failsafe kernel (fast-mode precursor; provisional per §7 until the executor differential job stands) |
+| `arena-cells` | §7 | **native placeholder** kernels (provisional per §7 until the executor differential job stands): M0 edge failsafe (coast brake) + M1 aligned active-brake cell with μ-band/sag/yaw-rate certification |
+| `arena-bench` | §4 | envelope bench (§4.2): certified vs achieved stopping distance sweeps, negative margin = build-blocking finding; dyno bench (§4.1): top speed, 0→v, stopping distances, stall push force, battery sag |
 | `arena-store` | §9/arena-store | episode schema, sha256 episode identity, layer version tags in every record |
 | `arena-tourney` | §8 | serializable `EpisodeMachine`, failsafe-ablation experiment with Wilson CIs and corpus hash |
 | `arena-cli` | — | `arena run / fuzz / ablate` |
@@ -38,6 +40,8 @@ arena run --seed 42             # one episode, prints identity/log hash/result
 arena fuzz --seeds 16           # determinism fuzz, in-process legs
 arena ablate --n 500 --seed 1   # M0 failsafe ablation report (JSON)
 arena replay --seed 42          # render both arms to HTML and open in browser
+arena bench envelope            # §4.2 conservatism report, both brake kernels
+arena bench dyno                # §4.1 speed/thrust/braking/sag table
 ```
 
 `arena replay` runs both arms of a seed (failsafe on + off), splices them into

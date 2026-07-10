@@ -5,6 +5,7 @@
 //! ablation runs against the same call shape the executor will use.
 
 use arena_core::{ArenaGeom, CONTROL_DT, GRAVITY};
+use arena_plant::dynamic::RigidBotSpec;
 use arena_plant::{BotSpec, DriveCmd, PlantState};
 use serde::{Deserialize, Serialize};
 
@@ -62,6 +63,13 @@ impl EdgeFailsafeCell {
         }
     }
 
+    /// The certified worst-case stopping distance this kernel claims for a
+    /// given speed — the number the envelope bench (§4.2) holds it to.
+    pub fn certified_stop_distance(&self, speed: f64) -> f64 {
+        let v1 = (speed.abs() + self.a_accel * CONTROL_DT).min(self.v_max);
+        v1 * v1 / (2.0 * self.a_brake) + v1 * CONTROL_DT
+    }
+
     /// Filter one control-tick command. Returns (command, intervened).
     pub fn filter(
         &self,
@@ -80,5 +88,108 @@ impl EdgeFailsafeCell {
         } else {
             (cmd, false)
         }
+    }
+}
+
+/// Active-braking envelope cell (M1, native placeholder). Where the M0 cell
+/// coasts (throttle 0 — on the dynamic plant that's back-EMF braking, which
+/// fades linearly with speed), this one commands *aligned* braking: the
+/// longitudinal motor force targets the velocity's longitudinal share of the
+/// certified friction budget, so that under friction-circle saturation the
+/// total ground force stays anti-parallel to the velocity — the optimal
+/// direction for a force of fixed magnitude. Over-braking longitudinally
+/// while sliding at an angle would rotate the force off the velocity axis
+/// and drop the along-track deceleration below cert (the §4.2 anisotropic
+/// case).
+///
+/// Certified braking authority is the worst case over the whole μ band and
+/// battery sag: min(kinetic-friction limit at μ_min, motor braking at
+/// worst-sag voltage). The envelope bench (§4.2) holds `certified_stop_
+/// distance` against the measured plant — any negative margin is a filed
+/// finding against THIS cell version.
+pub const ACTIVE_BRAKE_CELL_VERSION: &str = "0.1.0-m1-native-placeholder";
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ActiveBrakeCell {
+    /// Certified worst-case braking deceleration, m/s².
+    pub a_cert: f64,
+    /// Certified worst-case yaw spin-down rate, rad/s² — bounds the window
+    /// during which wheel scrub can contaminate linear braking.
+    pub alpha_cert: f64,
+    /// Per-wheel longitudinal force target at full certified braking, N.
+    f_long_cert_pw: f64,
+    /// Motor curve mirror (for inverting force -> throttle).
+    stall_force: f64,
+    no_load_speed: f64,
+    volt_ratio_worst: f64,
+    /// Low-speed fallback servo gain.
+    servo_gain: f64,
+}
+
+impl ActiveBrakeCell {
+    pub fn new(spec: &RigidBotSpec) -> Self {
+        let n_wheels = spec.wheels.len() as f64;
+        let a_friction = spec.mu_min * spec.mu_kinetic_ratio * GRAVITY;
+        let a_motor =
+            n_wheels * spec.motor.stall_force * spec.worst_voltage_ratio()
+                / spec.mass_kg;
+        let a_cert = a_friction.min(a_motor);
+        // Worst-case spin-down: kinetic friction at μ_min acting at the
+        // innermost wheel radius, derated 2x for partial slip alignment.
+        let r_min = spec
+            .wheels
+            .iter()
+            .map(|w| w.pos.norm())
+            .fold(f64::INFINITY, f64::min);
+        let alpha_cert = 0.5
+            * spec.mu_min
+            * spec.mu_kinetic_ratio
+            * spec.mass_kg
+            * GRAVITY
+            * r_min
+            / spec.yaw_inertia;
+        ActiveBrakeCell {
+            a_cert,
+            alpha_cert,
+            f_long_cert_pw: a_cert * spec.mass_kg / n_wheels,
+            stall_force: spec.motor.stall_force,
+            no_load_speed: spec.motor.no_load_speed,
+            volt_ratio_worst: spec.worst_voltage_ratio(),
+            servo_gain: 8.0,
+        }
+    }
+
+    /// Certified worst-case stopping distance from `speed` with initial yaw
+    /// rate `yaw_rate`, including one control period of reaction allowance.
+    ///
+    /// The yaw term is deliberately crude and conservative: while spinning,
+    /// wheel friction may be consumed by rotational scrub, so we certify
+    /// ZERO linear deceleration until the certified spin-down rate has
+    /// killed the rotation, then constant-decel braking from unchanged
+    /// speed. The envelope bench measures how much conservatism this costs.
+    pub fn certified_stop_distance(&self, speed: f64, yaw_rate: f64) -> f64 {
+        // 5% envelope factor on the braking term: without it the worst grid
+        // point (30° slip, μ_min) clears by tens of microns — real margin,
+        // not luck, is what gets certified.
+        const ENVELOPE_FACTOR: f64 = 1.05;
+        let v = speed.abs();
+        let t_spin = yaw_rate.abs() / self.alpha_cert;
+        v * t_spin + ENVELOPE_FACTOR * v * v / (2.0 * self.a_cert) + v * CONTROL_DT
+    }
+
+    /// Brake command from the body-frame longitudinal speed and total speed.
+    pub fn brake_cmd(&self, v_long: f64, speed: f64) -> DriveCmd {
+        let throttle = if speed < 0.02 {
+            // Near rest: plain speed servo, no alignment needed.
+            (-self.servo_gain * v_long).clamp(-1.0, 1.0)
+        } else {
+            // Target per-wheel longitudinal force = -(v_long/|v|) * certified
+            // budget; invert the linear motor curve at worst-case voltage.
+            let f_target = -self.f_long_cert_pw * (v_long / speed);
+            ((f_target / self.stall_force + v_long / self.no_load_speed)
+                / self.volt_ratio_worst)
+                .clamp(-1.0, 1.0)
+        };
+        DriveCmd { throttle, turn: 0.0 }
     }
 }
