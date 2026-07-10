@@ -8,6 +8,7 @@ pub mod catalogue;
 pub mod checks;
 pub mod render;
 pub mod schema;
+pub mod view;
 
 pub const ROBOWIRE_VERSION: &str = "0.1.0-m0";
 

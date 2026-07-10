@@ -1,0 +1,308 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>harness view</title>
+<style>
+  /* Committed dark: a wiring loom reads by glow. Deliberate single theme. */
+  :root {
+    --bg: #0d1114; --panel: #161c20; --line: #2a3339; --ink: #e6e9e4;
+    --dim: #8b969b; --accent: #e8a33d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); overflow: hidden;
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+  #scene { display: block; width: 100vw; height: 100vh; cursor: grab; }
+  #scene.dragging { cursor: grabbing; }
+  .hud {
+    position: fixed; padding: 10px 14px; background: color-mix(in srgb, var(--panel) 88%, transparent);
+    border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(4px);
+  }
+  #title { top: 14px; left: 14px; }
+  #title h1 {
+    margin: 0; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase;
+    font-family: "Avenir Next Condensed", "Arial Narrow", sans-serif; font-weight: 600;
+  }
+  #title .sub { color: var(--dim); font-size: 11px; }
+  #legend { top: 14px; right: 14px; display: flex; flex-direction: column; gap: 4px; }
+  #legend label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+  #legend input { accent-color: var(--accent); }
+  #legend .sw { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+  #tip {
+    bottom: 14px; left: 14px; font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+    max-width: 46ch; display: none;
+  }
+  #tip .wid { color: var(--accent); font-weight: 700; }
+  #help { bottom: 14px; right: 14px; color: var(--dim); font-size: 11px; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="hud" id="title"><h1 id="name">harness</h1><div class="sub">wiring on the geometry it belongs to — drag to orbit, wheel to zoom, hover a wire</div></div>
+<div class="hud" id="legend"></div>
+<div class="hud" id="tip"><span class="wid" id="tipname"></span><div id="tipends"></div></div>
+<div class="hud" id="help">robowire view · local file · nothing leaves this machine</div>
+<script>
+const SCENE =
+//__SCENE__
+{};
+
+(function () {
+  "use strict";
+  const COLORS = {
+    vbat: "#e05c50", v5: "#e8a33d", v33: "#c3c94f", gnd: "#7d8b93",
+    pwm: "#4f9dd6", uart: "#a97fd6", i2c: "#57b48f", xshut: "#57b48f", sig: "#9aa4ab",
+  };
+  const CLASS_LABELS = {
+    vbat: "VBAT 7.4V", v5: "5V BEC", v33: "3V3 rail", gnd: "ground",
+    pwm: "ESC PWM", uart: "CRSF uart", i2c: "I2C bus", xshut: "XSHUT lines",
+  };
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const cv = document.getElementById("scene");
+  const cx = cv.getContext("2d");
+  document.getElementById("name").textContent = SCENE.name;
+
+  // ---- camera ------------------------------------------------------------
+  let yaw = -0.7, pitch = 0.5, dist = 260, dpr = 1;
+  const center = [0, 0, 14];
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    cv.width = innerWidth * dpr;
+    cv.height = innerHeight * dpr;
+  }
+  function project(p) {
+    // world mm -> camera: yaw about z, pitch about x, z-up.
+    const dx = p[0] - center[0], dy = p[1] - center[1], dz = p[2] - center[2];
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const x1 = dx * cy - dy * sy, y1 = dx * sy + dy * cy;
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const y2 = y1 * cp - dz * sp;
+    const z2 = y1 * sp + dz * cp;
+    const depth = dist + y2;
+    if (depth < 10) return null;
+    const f = 900 * dpr / depth;
+    return [cv.width / 2 + x1 * f, cv.height / 2 - z2 * f, depth, f];
+  }
+
+  // ---- state -------------------------------------------------------------
+  const enabled = {};
+  for (const w of SCENE.wires) enabled[w.class] = true;
+  let hover = null; // wire index
+  let focusNode = null;
+
+  // legend
+  const legend = document.getElementById("legend");
+  const classes = [...new Set(SCENE.wires.map(w => w.class))];
+  for (const c of classes) {
+    const lab = document.createElement("label");
+    const inp = document.createElement("input");
+    inp.type = "checkbox"; inp.checked = true;
+    inp.addEventListener("change", () => { enabled[c] = inp.checked; draw(); });
+    const sw = document.createElement("span");
+    sw.className = "sw"; sw.style.background = COLORS[c] || "#999";
+    lab.append(inp, sw, document.createTextNode(CLASS_LABELS[c] || c));
+    legend.appendChild(lab);
+  }
+
+  // ---- drawing -----------------------------------------------------------
+  function chassisEdges() {
+    const hw = SCENE.chassis.half_width, prof = SCENE.chassis.profile;
+    const edges = [];
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < prof.length; i++) {
+        const a = prof[i], b = prof[(i + 1) % prof.length];
+        edges.push([[a[0], s * hw, a[1]], [b[0], s * hw, b[1]]]);
+      }
+    }
+    for (const v of prof) edges.push([[v[0], -hw, v[1]], [v[0], hw, v[1]]]);
+    return edges;
+  }
+
+  function boxEdges(n) {
+    const [l, w, h] = n.size.map(v => v / 2);
+    const [px, py, pz] = n.pos;
+    const c = [];
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1])
+      c.push([px + sx * l, py + sy * w, pz + sz * h]);
+    const idx = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+    return idx.map(([a, b]) => [c[a], c[b]]);
+  }
+
+  function strokePolyline(pts, color, width, dashed, glow) {
+    cx.beginPath();
+    let started = false;
+    for (const p of pts) {
+      const q = project(p);
+      if (!q) { started = false; continue; }
+      if (!started) { cx.moveTo(q[0], q[1]); started = true; }
+      else cx.lineTo(q[0], q[1]);
+    }
+    cx.strokeStyle = color;
+    cx.lineWidth = width;
+    cx.setLineDash(dashed ? [6 * dpr, 5 * dpr] : []);
+    if (glow) { cx.shadowColor = color; cx.shadowBlur = 10 * dpr; }
+    cx.stroke();
+    cx.shadowBlur = 0;
+    cx.setLineDash([]);
+  }
+
+  let flowPhase = 0;
+  function draw() {
+    cx.clearRect(0, 0, cv.width, cv.height);
+    // floor grid
+    cx.globalAlpha = 0.35;
+    for (let g = -60; g <= 60; g += 20) {
+      strokePolyline([[g, -60, 0], [g, 60, 0]], "#1d262c", 1 * dpr, false, false);
+      strokePolyline([[-60, g, 0], [60, g, 0]], "#1d262c", 1 * dpr, false, false);
+    }
+    cx.globalAlpha = 1;
+
+    // chassis + wheels
+    for (const e of chassisEdges()) strokePolyline(e, "#3d4a52", 1.4 * dpr, false, false);
+    for (const w of SCENE.wheels) {
+      const ring = [];
+      for (let a = 0; a <= 24; a++) {
+        const t = a / 24 * Math.PI * 2;
+        ring.push([w.pos[0] + w.radius * Math.cos(t), w.pos[1], w.pos[2] + w.radius * Math.sin(t)]);
+      }
+      strokePolyline(ring, "#333d44", 1.2 * dpr, false, false);
+    }
+
+    // nodes (boxes + labels)
+    for (const n of SCENE.nodes) {
+      const dimmed = focusNode && n.id !== focusNode && !wireTouches(focusNode, n.id);
+      cx.globalAlpha = dimmed ? 0.25 : 1;
+      for (const e of boxEdges(n)) strokePolyline(e, "#77848c", 1.2 * dpr, false, false);
+      const q = project([n.pos[0], n.pos[1], n.pos[2] + n.size[2] / 2 + 5]);
+      if (q) {
+        cx.fillStyle = n.id === focusNode ? "#e8a33d" : "#c7ced2";
+        cx.font = `${11 * dpr}px ui-monospace, Menlo, monospace`;
+        cx.fillText(n.id, q[0] - 10 * dpr, q[1]);
+      }
+      cx.globalAlpha = 1;
+    }
+
+    // wires
+    SCENE.wires.forEach((w, i) => {
+      if (!enabled[w.class]) return;
+      const isHover = i === hover;
+      const touched = !focusNode || w.ends.some(e => e.startsWith(focusNode + "."));
+      cx.globalAlpha = touched ? 1 : 0.12;
+      const color = COLORS[w.class] || "#999";
+      strokePolyline(w.pts, color, (isHover ? 3.4 : 1.9) * dpr, w.dashed, true);
+      // current-flow pips on power wires
+      if (!reduced && ["vbat", "v5", "v33"].includes(w.class) && touched) {
+        const t = (flowPhase + i * 0.17) % 1;
+        const seg = Math.min(Math.floor(t * (w.pts.length - 1)), w.pts.length - 2);
+        const f = t * (w.pts.length - 1) - seg;
+        const a = w.pts[seg], b = w.pts[seg + 1];
+        const q = project([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]);
+        if (q) {
+          cx.beginPath();
+          cx.arc(q[0], q[1], 2.6 * dpr, 0, Math.PI * 2);
+          cx.fillStyle = color;
+          cx.shadowColor = color; cx.shadowBlur = 8 * dpr;
+          cx.fill();
+          cx.shadowBlur = 0;
+        }
+      }
+      cx.globalAlpha = 1;
+    });
+  }
+
+  function wireTouches(a, b) {
+    return SCENE.wires.some(w =>
+      w.ends.some(e => e.startsWith(a + ".")) && w.ends.some(e => e.startsWith(b + ".")));
+  }
+
+  // ---- interaction ---------------------------------------------------------
+  let dragging = false, lx = 0, ly = 0;
+  cv.addEventListener("pointerdown", e => {
+    dragging = true; lx = e.clientX; ly = e.clientY;
+    cv.classList.add("dragging"); cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointerup", e => {
+    dragging = false; cv.classList.remove("dragging");
+    // click (no drag): node focus toggle
+    if (Math.hypot(e.clientX - lx, e.clientY - ly) < 4) {
+      const n = pickNode(e.clientX * dpr, e.clientY * dpr);
+      focusNode = n && n !== focusNode ? n : null;
+      draw();
+    }
+  });
+  cv.addEventListener("pointermove", e => {
+    if (dragging) {
+      yaw += (e.clientX - lx) * 0.008;
+      pitch = Math.max(0.05, Math.min(1.45, pitch + (e.clientY - ly) * 0.006));
+      lx = e.clientX; ly = e.clientY;
+      draw();
+    } else {
+      const h = pickWire(e.clientX * dpr, e.clientY * dpr);
+      if (h !== hover) {
+        hover = h;
+        const tip = document.getElementById("tip");
+        if (h !== null) {
+          document.getElementById("tipname").textContent =
+            SCENE.wires[h].id + "  (" + (CLASS_LABELS[SCENE.wires[h].class] || SCENE.wires[h].class) + ")";
+          document.getElementById("tipends").textContent = SCENE.wires[h].ends.join("  ·  ");
+          tip.style.display = "block";
+        } else tip.style.display = "none";
+        draw();
+      }
+    }
+  });
+  cv.addEventListener("wheel", e => {
+    e.preventDefault();
+    dist = Math.max(90, Math.min(700, dist * (1 + e.deltaY * 0.001)));
+    draw();
+  }, { passive: false });
+
+  function pickWire(mx, my) {
+    let best = null, bestD = 8 * dpr;
+    SCENE.wires.forEach((w, i) => {
+      if (!enabled[w.class]) return;
+      for (let k = 0; k + 1 < w.pts.length; k++) {
+        const a = project(w.pts[k]), b = project(w.pts[k + 1]);
+        if (!a || !b) continue;
+        const d = distSeg(mx, my, a[0], a[1], b[0], b[1]);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+    });
+    return best;
+  }
+  function pickNode(mx, my) {
+    let best = null, bestD = 26 * dpr;
+    for (const n of SCENE.nodes) {
+      const q = project(n.pos);
+      if (!q) continue;
+      const d = Math.hypot(mx - q[0], my - q[1]);
+      if (d < bestD) { bestD = d; best = n.id; }
+    }
+    return best;
+  }
+  function distSeg(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2)) : 0;
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  window.addEventListener("resize", () => { resize(); draw(); });
+  resize();
+  draw();
+  if (!reduced) {
+    (function tick() {
+      flowPhase = (flowPhase + 0.006) % 1;
+      draw();
+      requestAnimationFrame(tick);
+    })();
+  }
+})();
+</script>
+</body>
+</html>
