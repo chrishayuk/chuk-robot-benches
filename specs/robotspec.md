@@ -150,9 +150,9 @@ as-designed spec:
 - Q1. Density map fidelity: per-part densities vs per-material — is per-material enough
   for ant-scale CoG accuracy (±1mm target)? (Lean: per-material, validated by the M3
   tilt-table deltas.)
-- Q2. Sensor type registry: sensor models (noise/latency/FoV per part number) as a shared
-  versioned catalogue referenced by type_ref — who owns it, RobotSpec or arena-sense?
-  (Lean: a shared `parts/` catalogue both cite; same answer for motors/tyres/batteries.)
+- Q2. ~~Sensor type registry~~ — **resolved by robowire §2.1**: a shared, versioned,
+  content-hashed `parts/` catalogue cited as `part@hash`; same answer for
+  motors/tyres/batteries.
 - Q3. Does the transmitter/controller configuration (intent mapping, rates) belong in
   RobotSpec, or is it a Protocol concern? (Lean: the *capability* — intent format,
   link protocol — is RobotSpec; the human's stick preferences are Protocol.)

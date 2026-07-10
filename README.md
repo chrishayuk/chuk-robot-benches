@@ -14,6 +14,7 @@ another's internals.
 | `specs/chuk-arena.md` | the proving ground: deterministic sim, benches, tournament, gap ledger |
 | `specs/robotspec.md` | the robot as a content-addressed artifact (schema, hashing, derivation rule, as-built layer) |
 | `specs/robotspec-viewer.md` | the inspector: derived quantities rendered on the geometry that produced them |
+| `specs/robowire.md` | the electrical truth: netlist + parts catalogue → E-checks, power graph, generated bench procedure |
 | `chuk-arena/` | Rust workspace implementing the chuk-arena spec (M0 done, M1 near-done) |
 
 Module directories appear when their first code lands (robotspec derivation library,
