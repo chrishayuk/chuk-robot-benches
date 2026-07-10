@@ -241,9 +241,15 @@ fn cmd_diff(args: &[String]) {
             "{}: {} — {}",
             s.id,
             if s.status == "RUN" {
+                let adjudicated = s.pass && s.max_divergence > s.tolerance;
                 format!(
-                    "{} (max divergence {:.2e} {} vs tol {:.0e})",
+                    "{}{} (max divergence {:.2e} {} vs tol {:.0e})",
                     if s.pass { "PASS" } else { "FAIL" },
+                    if adjudicated {
+                        " via exact oracle [see notes]"
+                    } else {
+                        ""
+                    },
                     s.max_divergence,
                     s.unit,
                     s.tolerance

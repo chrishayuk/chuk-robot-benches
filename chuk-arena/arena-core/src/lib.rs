@@ -6,6 +6,10 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod contact;
+
+/// Version of the M0 world primitives — unchanged so the banked corpus stays
+/// reproducible; the contact module carries contact::CONTACT_VERSION.
 pub const ARENA_CORE_VERSION: &str = "0.1.0-m0";
 
 pub const WORLD_HZ: u32 = 8_000;
