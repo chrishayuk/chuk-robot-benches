@@ -1,0 +1,7 @@
+{
+  "id": "power-switch-slide",
+  "kind": "switch",
+  "mass_g": 1.5,
+  "provisional": true,
+  "notes": "main-path switch (tech-check E40)"
+}

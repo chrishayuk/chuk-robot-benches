@@ -1,0 +1,7 @@
+{
+  "id": "n20-motor-6v",
+  "kind": "motor",
+  "mass_g": 9.0,
+  "provisional": true,
+  "notes": "brushed N20 gearmotor, 6V winding; curve fitted at Station 2 later"
+}

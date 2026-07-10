@@ -1,0 +1,7 @@
+{
+  "id": "bbb-dual-esc",
+  "kind": "esc",
+  "mass_g": 5.0,
+  "provisional": true,
+  "notes": "dual brushed ESC"
+}

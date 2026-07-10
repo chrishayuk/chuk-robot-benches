@@ -1,0 +1,7 @@
+{
+  "id": "rp2350-zero",
+  "kind": "mcu",
+  "mass_g": 2.5,
+  "provisional": true,
+  "notes": "RP2350 board; reflex organ host"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "vl53l0x-breakout",
+  "kind": "tof",
+  "mass_g": 1.0,
+  "fov_deg": 25.0,
+  "range_mm": 1200.0,
+  "provisional": true,
+  "notes": "downward edge-detection ToF; dual units need XSHUT reassignment (robowire E20)"
+}

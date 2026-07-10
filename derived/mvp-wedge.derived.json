@@ -1,0 +1,87 @@
+{
+  "pipeline_version": "derive-v0.1.0-parametric",
+  "schema_version": "robotspec-v0.1",
+  "resolved_parts": {
+    "bbb-dual-esc": "a49f819e791508abe9a9b6e58728f267d99cfa32da4c92653b659b6b2b2e6c2f",
+    "elrs-rx": "9c8fa30ecf07d0fd24b422d1ff200ddd6cd5f15cd94fd95fc94c79f019beed6e",
+    "harness-allowance": "6687bc52a11f4f10b098bec86559c5bb261f247fe3cf84a709f7ea0190ec8769",
+    "imu-icm42688": "e240a35b73bd8238e3b7414efd4b2ff26097a39bb6817841b201118094cf4967",
+    "lipo-2s-260": "42a0dae25ee1e1532bd51d207ed4f423cfbf56af3e3faeef8da59638d1df7751",
+    "n20-motor-6v": "a56a3c259d3e8e7deab18c3fea24d31f3ee7db08ccbcc0547131527a3ae372bf",
+    "power-switch-slide": "79342a2965fb4806671abc3204ccd5452953025d4945791899af107eccea9f36",
+    "rp2350-zero": "30dcce989e722a22826f3fea28af708352d67cc809c788d81c483e2c1e7102bb",
+    "vl53l0x-breakout": "b189697ef05337218275bae9c13ca3c0640f7656782f800e17ab64796651e48d",
+    "wheel-32-foam": "fd4886009c8cfda2db9c4bc895672d8580df676d2ec73ee0ec56ed0639bb0639"
+  },
+  "mass_total_g": 100.93538198424494,
+  "mass_chassis_g": 41.93538198424494,
+  "mass_parts_g": 59.0,
+  "budget_margin_g": 49.06461801575506,
+  "cog_mm": [
+    -12.330503425391491,
+    0.29721985898545156,
+    11.2478532419728
+  ],
+  "yaw_inertia_gmm2": 91314.05178430925,
+  "footprint_mm": [
+    95.0,
+    95.0
+  ],
+  "bbox_mm": [
+    95.0,
+    95.0,
+    32.0
+  ],
+  "cube_fit": true,
+  "support_polygon_mm": [
+    [
+      -35.0,
+      -42.0
+    ],
+    [
+      45.0,
+      -40.0
+    ],
+    [
+      45.0,
+      40.0
+    ],
+    [
+      -35.0,
+      42.0
+    ]
+  ],
+  "worst_tip_edge": "rear",
+  "worst_tip_distance_mm": 22.66949657460851,
+  "worst_tip_angle_deg": 63.61091564284754,
+  "static_tip_energy_mj": 13.915808393287811,
+  "brake_pitch_limit_ms2": 49.98466545763765,
+  "checks": [
+    {
+      "code": "D01",
+      "description": "cube fit (bbox vs 101.6mm)",
+      "pass": true,
+      "detail": "bbox 95.0 x 95.0 x 32.0 mm"
+    },
+    {
+      "code": "D02",
+      "description": "mass within class limit",
+      "pass": true,
+      "detail": "100.9 g of 150 g"
+    },
+    {
+      "code": "D05",
+      "description": "wheel-chassis containment",
+      "pass": true,
+      "detail": "all wheels within footprint"
+    },
+    {
+      "code": "X03",
+      "description": "derivation rule: no hand-entered derivables",
+      "pass": true,
+      "detail": "all mass/CoG/inertia/geometry quantities computed by this pipeline"
+    }
+  ],
+  "body_hash": "963b370cf1521f53b9baf0462813e3f25e23a24f4fae2613e479ccb34193a61c",
+  "robot_hash": "fd8c1eb12ddd354bb23af3df9ac30c1abb060e57f81239ffa27bca85b53231cd"
+}

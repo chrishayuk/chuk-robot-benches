@@ -20,6 +20,10 @@ another's internals.
 | `specs/design-servers.md` | chuk-mcp-robocad + chuk-mcp-robowire: the design toolchain as MCP servers — AI-runnable propose-verify loop over the same libraries |
 | `specs/codes.md` | E/D/X check-code registry (cross-spec index; bugs-become-rules intake) |
 | `chuk-arena/` | Rust workspace implementing the chuk-arena spec (M0 done, M1 near-done) |
+| `robotspec/` | standalone crate: schema v0.1, derivation pipeline v0, D/X checks, body⊂robot hashing (`robotspec show robots/<name>.json`) |
+| `parts/` | the shared content-hashed parts catalogue (robotspec + robowire cite `part@hash`) |
+| `robots/` | authored RobotSpecs — the robots, as data |
+| `derived/` | committed derived artifacts (pipeline outputs, per derivation-pipeline v0 discipline) |
 
 Module directories appear when their first code lands (robotspec derivation library,
 robotspec-viewer prototype); specs precede code, per house discipline.

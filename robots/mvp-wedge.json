@@ -1,0 +1,58 @@
+{
+  "identity": {
+    "name": "mvp-wedge",
+    "revision": "r2",
+    "notes": "The MVP: 2WD antweight pusher wedge, dual downward ToF for edge detection, reflex-organ host. First robot of the programme. r2: wheels moved to the true rear after the r1 ledger showed a 4.8mm rear tip edge (derive-read-adjust loop, first use)."
+  },
+  "sources": {
+    "mech": {
+      "mode": "parametric",
+      "chassis": {
+        "length_mm": 95.0,
+        "width_mm": 95.0,
+        "rear_height_mm": 30.0,
+        "nose_height_mm": 2.0,
+        "wedge_length_mm": 40.0,
+        "wall_mm": 1.6,
+        "material": "petg",
+        "density_map": { "petg": 1.27 }
+      }
+    },
+    "elec": {
+      "ref": "PENDING-robowire-M0",
+      "hash": null
+    },
+    "models": {
+      "battery": "lipo-2s-260",
+      "motor": "n20-motor-6v",
+      "tyre": "wheel-32-foam"
+    },
+    "kernel": {
+      "family_hash": "native-placeholder-active-brake@0.1.0-m1",
+      "params": {}
+    }
+  },
+  "drive": {
+    "wheels": [
+      { "part": "wheel-32-foam", "pos_mm": [-35.0, 42.0, 16.0], "driven": true, "motor_part": "n20-motor-6v" },
+      { "part": "wheel-32-foam", "pos_mm": [-35.0, -42.0, 16.0], "driven": true, "motor_part": "n20-motor-6v" }
+    ]
+  },
+  "sensors": [
+    { "id": "tof_down_l", "part": "vl53l0x-breakout", "pos_mm": [5.0, 35.0, 8.0], "dir": [0.0, 0.0, -1.0] },
+    { "id": "tof_down_r", "part": "vl53l0x-breakout", "pos_mm": [5.0, -35.0, 8.0], "dir": [0.0, 0.0, -1.0] },
+    { "id": "imu", "part": "imu-icm42688", "pos_mm": [-25.0, 0.0, 22.0], "dir": [0.0, 0.0, 1.0] }
+  ],
+  "components": [
+    { "id": "battery", "part": "lipo-2s-260", "pos_mm": [5.0, 0.0, 6.0] },
+    { "id": "esc", "part": "bbb-dual-esc", "pos_mm": [-30.0, 0.0, 14.0] },
+    { "id": "mcu", "part": "rp2350-zero", "pos_mm": [-30.0, 0.0, 20.0] },
+    { "id": "rx", "part": "elrs-rx", "pos_mm": [-40.0, 0.0, 20.0] },
+    { "id": "switch", "part": "power-switch-slide", "pos_mm": [-40.0, 20.0, 26.0] },
+    { "id": "harness", "part": "harness-allowance", "pos_mm": [-20.0, 0.0, 12.0] }
+  ],
+  "skids": [
+    [45.0, 40.0],
+    [45.0, -40.0]
+  ]
+}

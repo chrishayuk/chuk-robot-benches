@@ -1,0 +1,7 @@
+{
+  "id": "imu-icm42688",
+  "kind": "imu",
+  "mass_g": 1.0,
+  "provisional": true,
+  "notes": "IMU breakout"
+}

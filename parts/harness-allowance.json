@@ -1,0 +1,7 @@
+{
+  "id": "harness-allowance",
+  "kind": "wiring",
+  "mass_g": 4.0,
+  "provisional": true,
+  "notes": "authored allowance until robowire M1 derives wiring mass from gauge x length"
+}

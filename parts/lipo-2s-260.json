@@ -1,0 +1,7 @@
+{
+  "id": "lipo-2s-260",
+  "kind": "battery",
+  "mass_g": 18.0,
+  "provisional": true,
+  "notes": "2S 260mAh; sag curve fitted later"
+}
