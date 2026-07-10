@@ -65,8 +65,8 @@ chuk-arena/
   serialize-roundtrip must be bit-identical on the reference platform (M3 Max).
   Cross-platform bit-determinism is *not* claimed in v0.1 (f64 core); a fixed-point core is
   a pre-registered v2 option if it becomes load-bearing.
-- Episode identity = hash(corpus config, design vectors, cell family hashes, plant versions,
-  seed). Same identity ⇒ same log, byte-for-byte.
+- Episode identity = hash(RobotSpec(s), EnvSpec, ProtocolSpec, plant/model versions, seed)
+  per the §3a factoring. Same identity ⇒ same log, byte-for-byte.
 
 ### 2.2 Physics core decision (pre-registered)
 
@@ -97,6 +97,10 @@ Known-divergence classes (e.g. Rapier's non-analytic contact stepping) are docum
 scenario before comparison, so filed divergences are attributable, not just counted.
 
 ## 3. Plant model (the design vector) — RobotSpec as derived digital twin
+
+*Canonical artifact standard: [`robotspec.md`](robotspec.md) — this section states what
+chuk-arena consumes; the RobotSpec spec owns the schema, hashing, derivation rule, and
+as-built layer. Inspection: [`robotspec-viewer.md`](robotspec-viewer.md).*
 
 A robot is a content-addressed artifact bundle, **derived from the same sources that build
 the physical bot** — never hand-duplicated:
@@ -130,6 +134,31 @@ Referenced sub-models are versioned, bench-calibrated artifacts:
 - **Battery:** sag curve vs current and state-of-charge, fitted.
 - **Chassis coupling:** the pendulum-fitted impulse→rotation coupling fraction (§4.3);
   effective restitution per face.
+
+## 3a. The factoring: Episode = Robot(s) × Environment × Protocol
+
+Robots, environments, and procedures are three orthogonal, independently content-addressed
+artifacts; an episode binds them with a seed.
+
+- **EnvSpec** — the environment alone: platform geometry, μ(x,y) field, edge/wall
+  configuration, temperature, acoustic background profile, camera/lighting profile.
+  Contains nothing about any robot. Physical environments are characterised into EnvSpecs
+  by environment instruments — **the friction sled is an EnvSpec instrument, not a robot
+  one** — and *venues are EnvSpecs*: characterise an event arena on arrival
+  (`bbb-event-YYYY-MM`), re-run the certification suite against it overnight, and fight
+  with a per-venue certificate.
+- **ProtocolSpec** — what a bench *is* once decoupled: a procedure (braking sweep, tilt,
+  shove, edge-adversarial, tournament, sensor-detection) parameterised over whichever
+  robot(s) and environment it binds. §4's benches are the standard protocol library, not
+  world-owners. Some protocols bind robot-only (HIL streams, dyno, tilt), some
+  environment-only (surface survey), most bind both.
+- **Queries are cross-products:** same robot × many environments (transfer), many robots ×
+  one environment (A/B), one protocol × both axes (regression). The physical lab mirrors
+  the factoring: Station 2 = robot characterisation, sled/survey = environment
+  characterisation, Station 1 = binding under protocol.
+
+Episode identity is `hash(RobotSpec(s), EnvSpec, ProtocolSpec, plant/model versions,
+seed)` (§2.1).
 
 ## 4. Virtual benches
 
@@ -276,6 +305,25 @@ retroactively invalidates the provisional results that depended on the divergent
   promise explicitly rather than silently missing it.
 
 ## 9. Calibration interface & gap ledger
+
+### 9.1 State observability contract
+
+Full robot state is readable at all times, digital or physical, under one schema:
+
+- **One schema:** the cell-ABI typed structs (inputs with staleness, outputs) + substrate
+  fields (per-motor current, rail voltages, link stats, mcycle margin, temperature),
+  versioned with the family hash. Sim and silicon serialize identically; consumers cannot
+  tell the worlds apart except by connection string.
+- **Transport tiers:** bench = wired full-rate (SWD/RTT/USB, Station 5 native); arena live
+  = decimated summary (~25–50Hz) over ELRS telemetry + event-triggered bursts (hits,
+  envelope overrides, escalations); arena complete = onboard hash-chained full-rate log
+  (RAM ring → flash), dumped post-run. Live is summary-rate; reconstruction is total.
+- **Belief vs truth:** physical believed state (bot) is always paired with ground truth
+  (overhead camera) in the same record; **live estimation error** is a first-class
+  observable and the dashboard's primary panel. Sim exposes the same pair natively.
+- **Survivorship rule:** capture must outlive failure — reset-persistent RAM ring,
+  last-gasp flush on brownout interrupt. Runs that end badly are the runs the record
+  exists for.
 
 - Every physical bench campaign (Station 2) produces a versioned model artifact consumed by
   arena-plant; every physical arena session (Station 1) produces episodes in the same

@@ -1,10 +1,10 @@
 # chuk-arena — the proving ground
 
 Deterministic virtual physics test environment for the robot programme.
-Full design: [SPEC.md](SPEC.md). Status: **M0 done; M1 done except §4.5
-edge-bench formalization on the dynamic plant** (SPEC §10). §2.2 kill
-criterion: PASS on the evaluable subset (C1 0.13% vs 1% tol, C4 84µm vs 5mm
-tol); C2/C3/C5 re-run when the M2 contact layer lands.
+Full design: [../specs/chuk-arena.md](../specs/chuk-arena.md). Status: **M0
+done; M1 done except §4.5 edge-bench formalization on the dynamic plant**
+(spec §10). §2.2 kill criterion: full §2.3 table evaluated — see
+`arena diff` for the current verdict.
 
 ## Layout
 
