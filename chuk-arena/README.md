@@ -37,9 +37,10 @@ cargo test --release            # includes determinism fuzz + zero-loss safety p
 arena run --seed 42             # one episode, prints identity/log hash/result
 arena fuzz --seeds 16           # determinism fuzz, in-process legs
 arena ablate --n 500 --seed 1   # M0 failsafe ablation report (JSON)
-
-# visual replay: export both arms of a seed, render to self-contained HTML
-arena run --seed 42 --duration 45 --out on.json
-arena run --seed 42 --duration 45 --no-kernel --out off.json
-python3 arena-view/render.py -o replay.html on.json off.json
+arena replay --seed 42          # render both arms to HTML and open in browser
 ```
+
+`arena replay` runs both arms of a seed (failsafe on + off), splices them into
+the embedded `arena-view/template.html`, writes `replay-seed<N>.html`, and opens
+it (`--out F` / `--no-open` to override). For replaying arbitrary exported logs
+(`arena run --out ep.json`), use `python3 arena-view/render.py -o replay.html ep.json …`.

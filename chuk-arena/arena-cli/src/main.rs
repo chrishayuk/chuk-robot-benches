@@ -1,5 +1,6 @@
 //! arena — chuk-arena CLI. M0 commands:
 //!   arena run --seed N [--no-kernel] [--duration S]   run one episode
+//!   arena replay [--seed N] [--duration S] [--out F]  render + open visual replay
 //!   arena fuzz [--seeds N]                            in-process determinism fuzz
 //!   arena ablate [--n N] [--seed S] [--duration S]    failsafe ablation report
 
@@ -54,6 +55,89 @@ fn cmd_run(args: &[String]) {
         "samples": log.samples.len(),
     });
     println!("{}", serde_json::to_string_pretty(&out).unwrap());
+}
+
+fn round_to(x: f64, places: i32) -> f64 {
+    let k = 10f64.powi(places);
+    (x * k).round() / k
+}
+
+/// Compact an EpisodeLog into the shape arena-view/template.html consumes
+/// (replay precision, not the bit-exact record — same as arena-view/render.py).
+fn compact_episode(log: &arena_store::EpisodeLog) -> serde_json::Value {
+    let cfg = &log.config;
+    let res = &log.result;
+    let events: Vec<serde_json::Value> = log
+        .events
+        .iter()
+        .map(|e| {
+            let v = serde_json::to_value(e).unwrap();
+            serde_json::json!({
+                "k": v["kind"],
+                "t": round_to(v["t"].as_f64().unwrap(), 3),
+            })
+        })
+        .collect();
+    let samples: Vec<serde_json::Value> = log
+        .samples
+        .iter()
+        .map(|s| {
+            serde_json::json!([
+                round_to(s.t, 2),
+                round_to(s.x, 4),
+                round_to(s.y, 4),
+                round_to(s.heading, 3),
+                round_to(s.v, 3),
+            ])
+        })
+        .collect();
+    serde_json::json!({
+        "seed": cfg.seed,
+        "kernel": cfg.kernel.enabled,
+        "arena": cfg.arena.half_extent,
+        "bot": {"w": cfg.bot.footprint_half_w, "l": cfg.bot.footprint_half_l},
+        "mu": round_to(res.mu, 3),
+        "driver": {
+            "lat": round_to(res.driver.reaction_latency_s, 3),
+            "agg": round_to(res.driver.aggression, 2),
+        },
+        "outcome": &res.outcome,
+        "interventions": res.interventions,
+        "minEdge": round_to(res.min_edge_distance, 4),
+        "events": events,
+        "samples": samples,
+    })
+}
+
+fn cmd_replay(args: &[String]) {
+    let seed = parse_u64(args, "--seed", 42);
+    let duration = parse_f64(args, "--duration", 45.0);
+    let out = flag_value(args, "--out").unwrap_or_else(|| format!("replay-seed{seed}.html"));
+
+    let on = run_episode(m0_config(seed, EdgeFailsafeParams::enabled_default(), duration));
+    let off = run_episode(m0_config(seed, EdgeFailsafeParams::disabled(), duration));
+    let data =
+        serde_json::to_string(&[compact_episode(&on), compact_episode(&off)]).unwrap();
+
+    const PLACEHOLDER: &str = "//__DATA__\n[];";
+    let template = include_str!("../../arena-view/template.html");
+    if !template.contains(PLACEHOLDER) {
+        die("arena-view/template.html is missing the //__DATA__ placeholder");
+    }
+    let html = template.replace(PLACEHOLDER, &format!("{data};"));
+    std::fs::write(&out, html).unwrap_or_else(|e| die(&format!("writing {out}: {e}")));
+    println!("wrote {out} (seed {seed}, failsafe on + off arms)");
+
+    if !flag_present(args, "--no-open") {
+        let opener = if cfg!(target_os = "macos") {
+            "open"
+        } else {
+            "xdg-open"
+        };
+        if let Err(e) = std::process::Command::new(opener).arg(&out).spawn() {
+            eprintln!("could not launch browser ({e}); open {out} manually");
+        }
+    }
 }
 
 fn cmd_fuzz(args: &[String]) {
@@ -112,10 +196,11 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(|s| s.as_str()) {
         Some("run") => cmd_run(&args[1..]),
+        Some("replay") => cmd_replay(&args[1..]),
         Some("fuzz") => cmd_fuzz(&args[1..]),
         Some("ablate") => cmd_ablate(&args[1..]),
         _ => {
-            eprintln!("usage: arena <run|fuzz|ablate> [flags]");
+            eprintln!("usage: arena <run|replay|fuzz|ablate> [flags]");
             std::process::exit(2);
         }
     }
