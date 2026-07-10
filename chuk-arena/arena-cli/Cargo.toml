@@ -9,6 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 arena-bench = { path = "../arena-bench" }
+arena-diff = { path = "../arena-diff" }
 arena-cells = { path = "../arena-cells" }
 arena-store = { path = "../arena-store" }
 arena-tourney = { path = "../arena-tourney" }

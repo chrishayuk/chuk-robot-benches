@@ -4,6 +4,7 @@
 //!   arena fuzz [--seeds N]                            in-process determinism fuzz
 //!   arena ablate [--n N] [--seed S] [--duration S]    failsafe ablation report
 //!   arena bench <envelope|dyno> [--out F]             virtual benches (§4.1/§4.2)
+//!   arena diff [--out F]                              Rapier differential rig (§2.3)
 
 use arena_cells::EdgeFailsafeParams;
 use arena_tourney::{experiments, m0_config, run_episode, EpisodeMachine};
@@ -233,6 +234,37 @@ fn cmd_bench(args: &[String]) {
     }
 }
 
+fn cmd_diff(args: &[String]) {
+    let report = arena_diff::differential_report();
+    for s in &report.scenarios {
+        eprintln!(
+            "{}: {} — {}",
+            s.id,
+            if s.status == "RUN" {
+                format!(
+                    "{} (max divergence {:.2e} {} vs tol {:.0e})",
+                    if s.pass { "PASS" } else { "FAIL" },
+                    s.max_divergence,
+                    s.unit,
+                    s.tolerance
+                )
+            } else {
+                s.status.clone()
+            },
+            s.description
+        );
+    }
+    eprintln!("kill criterion (§2.2): {}", report.kill_criterion);
+    let json = serde_json::to_string_pretty(&report).unwrap();
+    if let Some(path) = flag_value(args, "--out") {
+        std::fs::write(&path, &json)
+            .unwrap_or_else(|e| die(&format!("writing {path}: {e}")));
+        println!("wrote {path}");
+    } else {
+        println!("{json}");
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(|s| s.as_str()) {
@@ -241,8 +273,9 @@ fn main() {
         Some("fuzz") => cmd_fuzz(&args[1..]),
         Some("ablate") => cmd_ablate(&args[1..]),
         Some("bench") => cmd_bench(&args[1..]),
+        Some("diff") => cmd_diff(&args[1..]),
         _ => {
-            eprintln!("usage: arena <run|replay|fuzz|ablate|bench> [flags]");
+            eprintln!("usage: arena <run|replay|fuzz|ablate|bench|diff> [flags]");
             std::process::exit(2);
         }
     }

@@ -1,0 +1,10 @@
+[package]
+name = "arena-diff"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+arena-core = { path = "../arena-core" }
+rapier2d-f64 = "0.22"
+serde = { workspace = true }
+serde_json = { workspace = true }
