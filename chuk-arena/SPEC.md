@@ -96,13 +96,31 @@ is free, loosening requires a filed claim with rationale.
 Known-divergence classes (e.g. Rapier's non-analytic contact stepping) are documented per
 scenario before comparison, so filed divergences are attributable, not just counted.
 
-## 3. Plant model (the design vector)
+## 3. Plant model (the design vector) — RobotSpec as derived digital twin
 
-A bot is data: `BotSpec` = geometry (footprint polygon, wedge profile, lip spec class),
-mass properties (m, CoG xyz, yaw inertia), drive (per-wheel: position, radius, motor curve
-ref, gearing, tyre compound ref), battery ref, sensor fit (positions/orientations/refs),
-kernel ref (cell family hash + parameters). Everything the design search sweeps is here;
-nothing sweepable lives in code.
+A robot is a content-addressed artifact bundle, **derived from the same sources that build
+the physical bot** — never hand-duplicated:
+
+- **From CAD** (STL/STEP + material densities): footprint polygon, wedge profile, mass,
+  CoG, yaw inertia, sensor mounting positions and view cones. Geometry changes propagate
+  to the sim by derivation, not by remembering.
+- **From the circuit/power definition** (ECAD/netlist): power graph — rails, wiring
+  losses, battery→ESC→motor chain, current-sense points. Enables honest brownout
+  scenarios (hit-spike sag on the MCU rail is a real ant failure mode).
+- **Model refs:** bench-calibrated motor curves, tyre compounds (as ranges), battery sag,
+  chassis coupling fraction.
+- **Kernel ref:** cell family hash + parameters.
+
+`RobotSpec = hash(CAD derivation, power graph, model refs, sensor fit, kernel hash)`.
+Every episode cites the robot hash; a wedge-angle change is a new robot. Everything the
+design search sweeps lives here; nothing sweepable lives in code.
+
+*Derivation pipeline v0 (honest version):* run the CAD→mass-properties/sensor-cone tool on
+export and commit the derived artifact; the ECAD/netlist becomes a first-class design
+artifact alongside the CAD even for a bot simple enough to wire by hand — the brownout sim
+is only as honest as the power graph it is fed. (Interim state as of M1: `BotSpec` /
+`RigidBotSpec` are hand-written datasheet-provisional structs, flagged as such; they are
+the model-refs component of RobotSpec until the derivation pipeline lands.)
 
 Referenced sub-models are versioned, bench-calibrated artifacts:
 - **Motor curves:** stall torque, no-load speed, thermal derating — fitted from Station 2
@@ -129,7 +147,8 @@ Sweeps (v, heading, μ, CoG) → measured stopping point vs the envelope cell's 
 prediction. **Primary output: envelope conservatism margin** — certified distance minus
 achieved distance, distribution required ≥ 0 across the swept μ band (a single negative
 sample is a filed safety finding, build-blocking). Includes pitch-over limit interaction
-(a = g·x/h) and the rotate-then-brake anisotropic case.
+(a = g·x/h) and the rotate-then-brake anisotropic case. Once μ is a field (§4.7),
+braking across a μ-boundary — grippy onto slippery — joins the required sweep.
 **Adjudication:** a negative sample can mean a broken kernel *or* a broken sim/plant model
 — before the gap ledger closes (M4) these are indistinguishable from the number alone. The
 failing scenario is first re-run through the Rapier differential rig (§2.2): if the cores
@@ -165,6 +184,18 @@ without velocity-matching); opponent self-load per skim (feeds weapon-fatigue st
 **Physical twin:** drop rig + high-g logging + slow-mo. This bench carries the widest error
 bars in the system; its gap-ledger entry is expected to dominate and is watched accordingly.
 
+### 4.7 Perception / observability bench
+Environmental parameters become fields, not scalars: μ(x, y) over the platform (uniform
+sweeps, patches, gradients, in-episode variation); braking-across-a-μ-boundary is a
+required envelope scenario. For each (sensor, environmental parameter) pair the bench
+asks: detectable? time-to-detect? at what confidence? and does kernel behaviour change in
+response? — perception → estimation → action verified as a chain. Flagship capability:
+**online friction estimation** (commanded torque vs IMU-measured acceleration → live,
+spatially local μ estimate with staleness/confidence fields per §6), with the physical
+friction sled demoted to calibrating the estimator — the bot then measures the floor
+itself, continuously, during the fight. The envelope filter consuming live μ instead of a
+session constant is a certified-safety upgrade and a standing claim in §5.3.
+
 ## 5. Agents and strategy layer
 
 ### 5.1 Opponent archetypes
@@ -186,7 +217,9 @@ hazard tolerance (time-in-edge-zone vs win rate); bite denial ablation; ledger-g
 engagement vs naive aggression; smother/stall time-to-weapon-kill; srimech-press conversion
 rate; flee-naive vs posture-aware vs stochastic (exploitability curve: best-response
 opponent trained/scripted against each policy, edge measured); staleness tolerance
-(win-rate vs sensor latency — where does the rate-decoupled advantage collapse).
+(win-rate vs sensor latency — where does the rate-decoupled advantage collapse);
+live-μ envelope vs session-constant μ (edge-loss rate and conservatism cost on μ-field
+arenas, per §4.7 — the online-friction-estimation claim).
 
 ## 6. Sensor and channel models
 
@@ -266,8 +299,10 @@ retroactively invalidates the provisional results that depended on the divergent
 - **M2 (wk 6):** authentic mode (RV32 executor in-loop, gated on cell80 M2); impact/flip
   event layer + benches 4.3/4.4/4.6 with provisional (datasheet/video-fitted) parameters;
   archetype population v1; first tournament scoreboard.
-- **M3 (wk 8–10):** stateful weapon/damage systems; strategy experiment suite (§5.3) run
-  end-to-end; design search v1 producing first Pareto front + physical A/B shortlist.
+- **M3 (wk 8–10):** stateful weapon/damage systems; μ-field arenas + observability bench
+  4.7 with online μ-estimator v0; strategy experiment suite (§5.3) run end-to-end; design
+  search v1 producing first Pareto front + physical A/B shortlist; RobotSpec derivation
+  pipeline v0 (CAD export → derived artifact, committed).
 - **M4 (aligned with lab Stations 1–2 coming online):** calibration loop closed — bench-
   fitted models replace provisional ones; gap ledger live; replay validation running on
   real sessions.
