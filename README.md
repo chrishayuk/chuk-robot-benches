@@ -15,6 +15,8 @@ another's internals.
 | `specs/robotspec.md` | the robot as a content-addressed artifact (schema, hashing, derivation rule, as-built layer) |
 | `specs/robotspec-viewer.md` | the inspector: derived quantities rendered on the geometry that produced them |
 | `specs/robowire.md` | the electrical truth: netlist + parts catalogue → E-checks, power graph, generated bench procedure |
+| `specs/design-servers.md` | chuk-mcp-robocad + chuk-mcp-robowire: the design toolchain as MCP servers — AI-runnable propose-verify loop over the same libraries |
+| `specs/codes.md` | E/D/X check-code registry (cross-spec index; bugs-become-rules intake) |
 | `chuk-arena/` | Rust workspace implementing the chuk-arena spec (M0 done, M1 near-done) |
 
 Module directories appear when their first code lands (robotspec derivation library,
