@@ -1,0 +1,91 @@
+# Roadmap — the robot programme
+
+One page, cross-spec, kept honest: phases sequence the six specs' milestone ladders
+against what is actually built. Every phase ends in an acceptance gate that is a
+verifiable artifact (hash, report, or green suite) — never a vibe. Owning specs:
+[chuk-arena](specs/chuk-arena.md) · [robotspec](specs/robotspec.md) ·
+[robotspec-viewer](specs/robotspec-viewer.md) · [robowire](specs/robowire.md) ·
+[design-servers](specs/design-servers.md) · [codes](specs/codes.md) ·
+cell80 (external companion spec).
+
+## Phase 0 — done (2026-07-10 → 11)
+
+- **chuk-arena M0** ✅ — deterministic core (8kHz/1kHz), kinematic plant, edge geometry,
+  determinism fuzz green on all three legs; first pre-registered claim banked:
+  failsafe ablation N=500/arm, kernel-off 500/500 edge losses, kernel-on 0/500,
+  corpus `38f634eb…` (re-verified byte-identical after every subsequent change).
+- **chuk-arena M1 (all but one item)** ✅ — dynamic plant (friction-circle wheels,
+  motor curves, battery sag); envelope bench §4.2 (naive kernel: FINDING 179/210,
+  worst −178mm; active aligned kernel: PASS 210/210); dyno bench §4.1; throughput
+  checkpoint >2000× realtime single-core vs the 100× budget.
+- **Contact layer pulled forward from M2** ✅ — SAT/clipping manifolds, sequential
+  impulses, restitution, contact friction; **§2.2 kill criterion: PASS on the full
+  §2.3 table** (C1 0.13%, C2 0.03% vs Rapier and analytic, C3 exact via force
+  balance, C4 84µm, C5 0.9% energy). Two Rapier artifacts documented as
+  known-divergence classes; friction/corner impacts assigned to M4 physical
+  adjudication.
+- **arena-view v0** ✅ — episode replayer (counterfactual ghost) + interactive WASM
+  bench console (`arena replay`, `bench.html`), local-only.
+- **robotspec-viewer M0** ✅ — prototype exists (user-side; **not yet in repo** — import
+  is a Phase 1 chore).
+- **Six specs banked** ✅ — amended, cross-referenced, E/D/X code registry seeded.
+
+## Phase 1 — close M1, start the electrical truth (now)
+
+| Item | Owner spec | Gate |
+|---|---|---|
+| Edge bench §4.5 on the dynamic plant (episode machine generalized; counterexample-trace export) | chuk-arena M1 | zero losses across μ band for the certified kernel; any loss exports a trace |
+| robowire M0: netlist format + parts catalogue (MVP BOM ~10 parts) + checks E01–04, E10–11, E20–21, E40–41 | robowire M0 | **adversarial acceptance:** MVP harness passes AND planted faults (swapped polarity, dual-0x29, missing switch) fail with correct E-codes |
+| RobotSpec M0: schema v0.1 freeze, parametric mode, viewer hand-schema migrated | robotspec M0 | MVP wedge exists as a hashed RobotSpec cited by inspector + first arena episode |
+| Viewer prototype into repo (`robotspec-viewer/`) | robotspec-viewer | file lands, provisional flag on its private derivation copy |
+
+## Phase 2 — organs share one truth
+
+| Item | Owner spec | Gate |
+|---|---|---|
+| Impact/flip analytic event layer over the contact core; benches 4.3 (tilt) / 4.4 (shove) / 4.6 (bite), provisional parameters | chuk-arena M2 | bench reports with version tags; corner-impact divergence class re-examined against the event layer |
+| Opponent archetypes v1 + match harness + first tournament scoreboard | chuk-arena M2 | seeded scoreboard citing corpus hash |
+| Authentic mode (RV32 executor in-loop) | chuk-arena M2 | **gated on cell80 M2 (external)** — fast-mode results retroactively re-scored per §7 |
+| Shared derivation library (mass/CoG/hull/tip): one crate, consumed by viewer + arena-plant + robotspec | robotspec M1 = viewer M1 | one codebase, N consumers, zero drift by construction |
+| robowire M1: power-budget checks E30–32 + power graph + wiring mass into RobotSpec | robowire M1 | derived power section, no hand-entered duplicates (X03) |
+
+## Phase 3 — fields, search, and the AI design loop
+
+| Item | Owner spec | Gate |
+|---|---|---|
+| μ(x,y) fields + observability bench §4.7 + online μ-estimator v0; μ-boundary braking joins §4.2 | chuk-arena M3 | live-μ envelope vs session-constant claim runs (§5.3) |
+| Stateful weapon/damage systems; strategy suite §5.3 end-to-end | chuk-arena M3 | claims with error bars, corpus-hash cited |
+| Design search v1 (Sobol → CMA-ES/NSGA-II, robustness-weighted) → Pareto front + physical A/B shortlist | chuk-arena M3 | pre-registered predicted ranking for Station-1 validation |
+| RobotSpec derivation pipeline v0 (CAD export → derived artifact, committed) | robotspec M2 | derived sections carry pipeline version |
+| robowire M2: SVG diagram + generated bench procedure | robowire M2 | first physical harness verified against its own checklist |
+| design-servers M0–M1: robowire server, then robocad server | design-servers | agent transcript: propose → E-fail → fix → pass, no human edits |
+| Viewer M2: mesh ingest + parametric-vs-mesh centroid delta row | robotspec-viewer M2 | built-in pipeline cross-check visible |
+
+## Phase 4 — the loop closes on reality (aligned with lab Stations 1–2)
+
+| Item | Owner spec | Gate |
+|---|---|---|
+| Calibration loop: bench-fitted models replace provisional; gap ledger live; replay validation on real sessions | chuk-arena M4 | ledger trending; drift auto-files claims |
+| As-built layer: scale/tilt/free-run rituals + robowire electrical checklist as unit records; thresholds enforced | robotspec M3 | no certificate citation without a current as-built record |
+| Brownout scenarios from the derived power graph (not hand-modelled) | robowire M3 | first honest brownout episode |
+| Corner/friction impact adjudication: pendulum campaign data vs both solvers | chuk-arena §2.3/C2f | divergence class closed or model revised (as a campaign) |
+| Venue-as-EnvSpec ritual: characterise event arena on arrival, overnight recertification | chuk-arena §3a | per-venue kernel certificate |
+| design-servers M2–M3: robotspec_assemble + X-checks; LLM-proposer vs numeric optimiser (pre-registered) | design-servers | first end-to-end AI-authored RobotSpec hash in an arena episode |
+
+## Critical path to the first fight-ready MVP wedge
+
+robowire M0 (harness checked) → RobotSpec M0 (hashed identity) → §4.5 certification
+against that RobotSpec → physical build + as-built rituals (Phase 4 machinery, minimal
+form) → venue EnvSpec + overnight recertification. The external dependency is cell80 M2
+for authentic-mode certification; everything before it runs in flagged fast mode.
+
+## Standing invariants (every phase)
+
+- Determinism fuzz green (rerun / roundtrip / fresh-process) on every commit that
+  touches the sim.
+- M0 corpus hash `38f634eb…` reproduces until a re-baseline is declared (corpus-rot
+  rule §11.5) — never silently.
+- A negative envelope margin anywhere is build-blocking (§4.2), adjudicated via the
+  differential rig before reopening.
+- Bugs become rules: physical/agent-discovered statically-detectable failures land in
+  `specs/codes.md` first, then their checker.

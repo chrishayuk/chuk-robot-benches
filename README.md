@@ -6,6 +6,8 @@ Robot × Environment × Protocol factoring (specs/chuk-arena.md §3a): each owns
 concern, communicates through content-addressed artifacts, and never reaches into
 another's internals.
 
+**Where we are and what's next: [ROADMAP.md](ROADMAP.md).**
+
 ## Layout
 
 | path | what it is |
