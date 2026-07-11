@@ -4,7 +4,7 @@
 //! failures get a code in codes.md first, then a function here.
 
 use crate::catalogue::{ElecCatalogue, PinDecl};
-use crate::schema::{split_pin, Netlist};
+use crate::schema::{split_pin, Bus, Netlist};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -25,7 +25,7 @@ fn fail(code: &str, description: &str, detail: String) -> CheckResult {
 }
 
 /// Resolved pin declaration for "inst.PIN".
-fn pin_decl<'c>(
+pub fn pin_decl<'c>(
     nl: &Netlist,
     cat: &'c ElecCatalogue,
     endpoint: &str,
@@ -40,6 +40,32 @@ fn pin_decl<'c>(
         .as_ref()
         .and_then(|e| e.pins.get(pin))
         .ok_or_else(|| format!("part '{part_id}' has no pin '{pin}' (from '{endpoint}')"))
+}
+
+/// Resolve a motor terminal ("inst.PIN") to the single motor_out-role pin
+/// driving it on its net, if unambiguous. `None` on any ambiguity (a missing
+/// or multiply-connected net, or zero/multiple driver pins on it) — E01 will
+/// already be failing in that case. Shared between E01 and
+/// `runtime::run_state`'s motor-spin projection.
+pub fn motor_output_pin(
+    nl: &Netlist,
+    cat: &ElecCatalogue,
+    motor_terminal: &str,
+) -> Result<Option<String>, String> {
+    let endpoint = motor_terminal.to_string();
+    let nets: Vec<_> = nl.nets.iter().filter(|n| n.pins.contains(&endpoint)).collect();
+    if nets.len() != 1 {
+        return Ok(None);
+    }
+    let driver_pins: Vec<_> = nets[0]
+        .pins
+        .iter()
+        .filter(|p| pin_decl(nl, cat, p).map(|d| d.role == "motor_out").unwrap_or(false))
+        .collect();
+    if driver_pins.len() != 1 {
+        return Ok(None);
+    }
+    Ok(Some(driver_pins[0].clone()))
 }
 
 /// E01: every motor terminal pair reaches exactly one driver channel.
@@ -61,26 +87,11 @@ pub fn e01_motor_channels(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResu
         let mut channels = Vec::new();
         for pin in &motor_pins {
             let endpoint = format!("{inst}.{pin}");
-            let nets: Vec<_> = nl.nets.iter().filter(|n| n.pins.contains(&endpoint)).collect();
-            if nets.len() != 1 {
-                return Ok(fail(C, D, format!("{endpoint} appears in {} nets", nets.len())));
-            }
-            let driver_pins: Vec<_> = nets[0]
-                .pins
-                .iter()
-                .filter(|p| {
-                    pin_decl(nl, cat, p).map(|d| d.role == "motor_out").unwrap_or(false)
-                })
-                .collect();
-            if driver_pins.len() != 1 {
-                return Ok(fail(
-                    C,
-                    D,
-                    format!("{endpoint}: net '{}' has {} driver pins", nets[0].id, driver_pins.len()),
-                ));
-            }
-            let d = pin_decl(nl, cat, driver_pins[0])?;
-            channels.push((driver_pins[0].clone(), d.channel.clone().unwrap_or_default()));
+            let Some(driver_pin) = motor_output_pin(nl, cat, &endpoint)? else {
+                return Ok(fail(C, D, format!("{endpoint}: no single driver channel reaches it")));
+            };
+            let d = pin_decl(nl, cat, &driver_pin)?;
+            channels.push((driver_pin, d.channel.clone().unwrap_or_default()));
         }
         let chans: Vec<&String> = channels.iter().map(|(_, c)| c).collect();
         if chans.windows(2).any(|w| w[0] != w[1]) {
@@ -254,12 +265,22 @@ pub fn e11_pin_double_booking(nl: &Netlist, cat: &ElecCatalogue) -> Result<Check
     Ok(ok(C, D, "all MCU pins single-purpose".into()))
 }
 
+/// Each device's final I2C address after its reassignment plan (`reassign_to`
+/// if declared, else its default `addr`) — the grouping E20 fails on when a
+/// group has more than one member, shared with `runtime::run_state`'s
+/// `bus_conflict` projection.
+pub fn bus_final_addresses(bus: &Bus) -> BTreeMap<String, String> {
+    bus.devices
+        .iter()
+        .map(|dev| (dev.inst.clone(), dev.reassign_to.clone().unwrap_or_else(|| dev.addr.clone())))
+        .collect()
+}
+
 /// E20: I2C address collisions after the reassignment plan.
 pub fn e20_i2c_addresses(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult, String> {
     const C: &str = "E20";
     const D: &str = "I2C addresses unique after reassignment plan";
     for bus in &nl.buses {
-        let mut finals: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for dev in &bus.devices {
             let part_id = nl
                 .instances
@@ -285,10 +306,12 @@ pub fn e20_i2c_addresses(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResul
                     ));
                 }
             }
-            let final_addr = dev.reassign_to.clone().unwrap_or_else(|| dev.addr.clone());
-            finals.entry(final_addr).or_default().push(dev.inst.clone());
         }
-        for (addr, insts) in &finals {
+        let mut groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (inst, addr) in bus_final_addresses(bus) {
+            groups.entry(addr).or_default().push(inst);
+        }
+        for (addr, insts) in &groups {
             if insts.len() > 1 {
                 return Ok(fail(
                     C,
@@ -326,6 +349,36 @@ pub fn e21_bus_voltage(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult,
     Ok(ok(C, D, "all bus devices in the master's voltage domain".into()))
 }
 
+/// Whether `inst` (an LED) is wired to anything at all.
+fn led_is_wired(nl: &Netlist, inst: &str) -> bool {
+    let prefix = format!("{inst}.");
+    nl.nets.iter().any(|net| net.pins.iter().any(|p| p.starts_with(&prefix)))
+}
+
+/// Whether `inst` (an LED) has a resistor-kind neighbor on any net it's wired
+/// to — the E33 series-current-limiter rule, shared with
+/// `runtime::run_state`'s `lit` projection.
+pub fn led_current_limited(nl: &Netlist, cat: &ElecCatalogue, inst: &str) -> Result<bool, String> {
+    let prefix = format!("{inst}.");
+    let mut limited = false;
+    for net in &nl.nets {
+        if !net.pins.iter().any(|p| p.starts_with(&prefix)) {
+            continue;
+        }
+        for p in &net.pins {
+            let (other_inst, _) = split_pin(p)?;
+            if other_inst == inst {
+                continue;
+            }
+            let other_part = nl.instances.get(other_inst).and_then(|pid| cat.get(pid).ok());
+            if other_part.map_or(false, |(op, _)| op.kind == "resistor") {
+                limited = true;
+            }
+        }
+    }
+    Ok(limited)
+}
+
 /// E33: every LED must see a series current limiter — a bare LED across a
 /// rail (or a GPIO) is a statically detectable dead part. Registered in
 /// specs/codes.md before this function existed, per bugs-become-rules.
@@ -337,29 +390,7 @@ pub fn e33_led_current_limit(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckR
         if part.kind != "led" {
             continue;
         }
-        let prefix = format!("{inst}.");
-        let mut wired = false;
-        let mut limited = false;
-        for net in &nl.nets {
-            if !net.pins.iter().any(|p| p.starts_with(&prefix)) {
-                continue;
-            }
-            wired = true;
-            for p in &net.pins {
-                let (other_inst, _) = split_pin(p)?;
-                if other_inst == inst {
-                    continue;
-                }
-                let other_part = nl
-                    .instances
-                    .get(other_inst)
-                    .and_then(|pid| cat.get(pid).ok());
-                if other_part.map_or(false, |(op, _)| op.kind == "resistor") {
-                    limited = true;
-                }
-            }
-        }
-        if wired && !limited {
+        if led_is_wired(nl, inst) && !led_current_limited(nl, cat, inst)? {
             return Ok(fail(
                 C,
                 D,

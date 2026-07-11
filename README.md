@@ -25,6 +25,7 @@ another's internals.
 | `robots/` | authored RobotSpecs — the robots, as data |
 | `robowire/` | standalone crate: netlist schema, E-check engine, SVG render, 3D harness view, interactive designer (`robowire check|render|view|design`) |
 | `robowire-wasm/` | the E-check engine compiled for the browser — the designer's live verifier (same code as the CLI) |
+| `robosim/` | standalone crate: the live component simulator behind the designer's run mode — real Ohm's-law math (resistors, LED forward voltage, motor winding resistance) over a netlist + catalogue, decoupled from robowire so it can gain other consumers later |
 | `harness/` | authored netlists — the wiring, as data |
 | `derived/` | committed derived artifacts (pipeline outputs, per derivation-pipeline v0 discipline) |
 

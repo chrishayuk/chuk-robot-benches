@@ -3,7 +3,8 @@
   "kind": "led",
   "mass_g": 0.3,
   "provisional": true,
-  "notes": "forward ~2.0V @ 20mA",
+  "forward_v": 2.0,
+  "notes": "forward ~2.0V @ 20mA rated (actual live current = (V - forward_v) / series resistor, robowire run mode)",
   "description": "A red indicator light. Current flows in through the long leg (anode) and out the short leg (cathode) — and it MUST have a resistor in series, or it burns out the instant power arrives.",
   "elec": {
     "pins": {

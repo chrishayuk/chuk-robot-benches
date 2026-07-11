@@ -3,6 +3,7 @@
   "kind": "resistor",
   "mass_g": 0.2,
   "provisional": true,
+  "ohms": 1000.0,
   "notes": "1k ohm, 1/4W",
   "description": "A 1000-ohm resistor: dimmer LED current, pull-ups/pull-downs, or gentle signal limiting.",
   "elec": {

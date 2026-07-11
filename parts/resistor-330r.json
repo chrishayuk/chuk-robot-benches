@@ -3,6 +3,7 @@
   "kind": "resistor",
   "mass_g": 0.2,
   "provisional": true,
+  "ohms": 330.0,
   "notes": "330 ohm, 1/4W",
   "description": "A 330-ohm resistor: the standard current limiter for an LED on a 3.3-5V rail. Either leg first — resistors don't care about direction.",
   "elec": {

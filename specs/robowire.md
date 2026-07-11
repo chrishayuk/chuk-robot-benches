@@ -120,6 +120,67 @@ v0.1 set, drawn from how ant-class bots actually die:
 Check set is extensible; every new physical failure in the lab that was statically
 detectable becomes a new E-code (the compose-linker discipline: bugs become rules).
 
+## 3a. Interactive run mode (designer)
+
+The netlist plus catalogue support one more read: not just "is this legal" (§3) but
+"what does this DO right now" — click the switch, the LED lights; set a throttle, the
+motor spins. This is the designer's client-side stand-in for the bench technician who
+manually drives test points with a bench supply and probes, standing in for the
+not-yet-written reflex-kernel firmware. It is the interactive virtual twin of the
+generated bench verification procedure (§4 item 4) — the same rehearsal, live in the
+browser instead of printed on paper, before a single joint is soldered. The premise is
+literal: a design is built and proven *virtually* here before it is ever wired
+physically, so the numbers have to be right, not just plausible.
+
+Owned by the standalone **`robosim`** crate, not robowire itself — netlist + catalogue
+in, live per-net/per-instance state out. Kept separate so the simulator can gain
+consumers beyond the designer (arena-plant; a future real firmware emulator standing in
+for the human) without coupling them to netlist authoring or the E-check toolchain. It
+re-uses the E-check rule logic directly from `robowire::checks`
+(`led_current_limited`, `bus_final_addresses`, `motor_output_pin`) rather than
+re-deriving it, so a check and a run-mode projection can never disagree.
+
+Explicitly **not** a retreat from the non-goal wall (§1): no SPICE, no continuous
+dynamics, no timeline/trace, no firmware execution. Every net's hot/grounded state is
+event-driven boolean propagation over a kind/role-gated reachability graph:
+switch/button open/closed (user input), regulator/ESC-BEC/MCU-3V3-out passthrough
+(gated on the instance's own ground actually being connected), resistor/wiring
+always-conducting, seeded from the battery. arena-plant's dynamic sag/brownout
+behaviour remains strictly downstream and out of scope here; run mode doesn't depend on
+the power graph (§4 item 1, not yet built).
+
+**Every electrical value is real component math, never a fixed lookup.** Each net
+carries a live **voltage**: its own schema-declared `Net.volts` when directly authored,
+or — for the many intermediate nets nobody bothers to hand-annotate (the wire between a
+closed switch and the next component) — inherited from whatever it's *ideally*
+(losslessly) connected to, by propagating declared voltages across switch/button/wiring
+bridges only. A resistor or a regulated passthrough output is a real voltage boundary
+and never inherits this way; without that distinction, an unannotated net downstream of
+a closed switch would wrongly read 0V. Current is Ohm's law against that live voltage,
+using catalogue-declared REAL component properties: a resistor's `ohms` and an LED's
+`forward_v` solve I = (V − Vf) / R for a lit, current-limited LED (the standard
+LED+resistor hand-calculation — a fixed-Vf diode approximation, not an iterative
+nonlinear SPICE solve); a motor's winding resistance (`nominal_v / stall_current_a`)
+scales its current with both throttle and the actual supply voltage; a fixed-power
+device's equivalent resistance (`nominal_v / current_ma`) does the same for anything
+else with a declared rated operating point (sensors, MCU, ESC/regulator quiescent draw,
+radio, buzzer). Every net's current is the Σ of every such load reachable downstream of
+it over the same graph as `hot` — worst-case-style summation (still not a
+current-divider/Kirchhoff solve), but now built from real per-component resistances
+instead of a flat "fixed mA" figure, so **if the voltage changes, the current changes
+with it**. A part missing the catalogue fields a calculation needs contributes 0A
+rather than a guess.
+
+- **Inputs:** switch/button state (user-toggled/held), per-motor throttle, per-sensor
+  fake reading (there is no firmware yet to generate a real one — see `robosim`'s
+  module docs for the seam a future emulator would plug into instead).
+- **Outputs:** per-net energized state (hot/grounded) + live volts/amps; per-instance
+  projection — `powered` (regulator/ESC/MCU/sensor/radio/buzzer), `closed`
+  (switch/button), `lit` + `current_limited` (LED, with a `reason` when dark or
+  unprotected), `spin` + `current_a` (motor), `current_a` (battery, its own net's amps;
+  regulator/ESC/MCU/sensor/radio/buzzer, their own equivalent-resistance draw),
+  `value` + `bus_conflict` (bus sensors).
+
 ## 4. Derived outputs
 
 1. **Power graph** → RobotSpec `power:` section and arena-plant brownout model (rails,
@@ -158,6 +219,14 @@ detectable becomes a new E-code (the compose-linker discipline: bugs become rule
   E20–E21, E40–E41. *Acceptance: the MVP wedge's harness passes, and deliberately
   broken variants (swapped polarity, dual-0x29, missing switch) fail with correct
   E-codes.*
+- **M0.5:** interactive run mode (§3a), in the standalone `robosim` crate — click-to-
+  toggle switch/button, throttle + fake-sensor controls, event-driven net energization,
+  real Ohm's-law voltage/current per net and component (resistor `ohms`, LED
+  `forward_v`, motor winding resistance, fixed-power equivalent resistance — never a
+  fixed figure), no firmware/timeline. Depends only on M0 (schema + checks), not on
+  M1's power graph. *Acceptance: a green `run_state` test suite against the MVP wedge
+  harness and a dedicated demo harness exercising switch+LED+motor+sensor+button,
+  including tests proving current changes when voltage does.*
 - **M1:** power budget checks (E30–E32) + power graph derivation into RobotSpec; wiring
   mass derivation.
 - **M2:** diagram render (SVG) + generated bench verification procedure; first physical

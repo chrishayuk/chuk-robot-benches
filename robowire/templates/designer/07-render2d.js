@@ -50,17 +50,25 @@
         cx.fillText("✕", g.x + g.w / 2 - 2, g.y - g.h / 2 + 6);
         cx.textAlign = "left";
       }
+      if (runMode) drawRunOverlay2d(inst, g);
     }
 
     // 2) wires (lead stubs + exit-directed cubics), over the boxes
     nl.nets.forEach((net, i) => {
       const cls = netClass(net);
       if (!layerOn[cls]) return;
-      const col = COLORS[cls] || "#999";
+      let col = COLORS[cls] || "#999";
+      let flowing = false;
+      if (runMode) {
+        const ns = runState.nets && runState.nets[net.id];
+        flowing = !!(ns && ns.amps > 0.001);
+        if (flowing) col = "#57b48f"; // green — current is actually flowing here
+      }
       const { legs, segs, hub } = netSegments(net);
       cx.strokeStyle = col;
       cx.lineWidth = i === selNet ? 3 : 1.8;
       cx.shadowColor = col; cx.shadowBlur = i === selNet ? 12 : 5;
+      if (flowing) { cx.setLineDash([8, 6]); cx.lineDashOffset = -spinPhase * 14; }
       for (const [a, b] of legs) {
         cx.beginPath(); cx.moveTo(a[0], a[1]); cx.lineTo(b[0], b[1]); cx.stroke();
       }
@@ -70,8 +78,26 @@
         cx.bezierCurveTo(seg[1][0], seg[1][1], seg[2][0], seg[2][1], seg[3][0], seg[3][1]);
         cx.stroke();
       }
+      if (flowing) { cx.setLineDash([]); cx.lineDashOffset = 0; }
       cx.shadowBlur = 0;
       if (hub) { cx.fillStyle = col; cx.beginPath(); cx.arc(hub[0], hub[1], 3.4, 0, Math.PI * 2); cx.fill(); }
+      if (runMode) {
+        const ns = runState.nets && runState.nets[net.id];
+        if (ns && (ns.hot || ns.amps > 0.001)) {
+          const lp = hub || netLabelPos(net);
+          if (lp) {
+            const label = `${ns.volts.toFixed(1)}V · ${ns.amps.toFixed(2)}A`;
+            cx.font = "9px ui-monospace, Menlo, monospace";
+            const lw = cx.measureText(label).width;
+            cx.fillStyle = "#0d1114cc";
+            cx.fillRect(lp[0] - lw / 2 - 3, lp[1] - 18, lw + 6, 12);
+            cx.fillStyle = col;
+            cx.textAlign = "center";
+            cx.fillText(label, lp[0], lp[1] - 9);
+            cx.textAlign = "left";
+          }
+        }
+      }
       if (i === selNet) {
         cx.font = "bold 9px ui-monospace, Menlo, monospace";
         for (const ep of net.pins) {

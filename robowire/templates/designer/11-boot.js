@@ -1,6 +1,10 @@
 // designer/11-boot.js — event wiring + startup — original execution order preserved
   cv.addEventListener("pointerdown", e => {
     const mx = e.offsetX, my = e.offsetY;
+    if (runMode) {
+      if (handleRunPointerDown(mx, my)) cv.setPointerCapture(e.pointerId);
+      return;
+    }
     const pin = pinAt(mx, my);
     if (pin) {
       if (pickHandler) { const h = pickHandler; pickHandler = null; h(pin); refresh(); return; }
@@ -87,6 +91,8 @@
     }
   });
   cv.addEventListener("pointerup", e => {
+    if (runMode) return; // release is handled globally (see 12-run.js) — a
+    // hold started from the side panel may release off-canvas.
     if (wireDrag) {
       const target = pinAt(e.offsetX, e.offsetY);
       if (wireDrag.moved && target && target !== wireDrag.from) {
@@ -126,6 +132,7 @@
     }
   });
   cv.addEventListener("drop", e => {
+    if (runMode) return;
     const partId = e.dataTransfer.getData("text/robowire-part");
     if (!partId) return;
     e.preventDefault();
@@ -135,6 +142,7 @@
   window.addEventListener("keydown", e => {
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (runMode) { if (e.key === "Escape") exitRunMode(); return; }
     if (e.key === "Escape") { pending = null; pickHandler = null; wireDrag = null; selInst = null; selNet = -1; renderNets(); renderSelInfo(); draw(); hint(""); }
     if ((e.key === "r" || e.key === "R") && selInst && mode === "2d") {
       const L = layout[selInst];
@@ -164,6 +172,7 @@
     dlg.showModal();
   });
   document.getElementById("ioApply").addEventListener("click", () => {
+    if (runMode) exitRunMode();
     try {
       nl = JSON.parse(document.getElementById("ioText").value);
       if (!nl.failsafe) nl.failsafe = { rx_loss: "", stop_pins: [] };

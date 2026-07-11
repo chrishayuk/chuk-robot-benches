@@ -3,7 +3,9 @@
   "kind": "esc",
   "mass_g": 5.0,
   "provisional": true,
-  "notes": "dual brushed ESC with 5V BEC",
+  "current_ma": 15.0,
+  "nominal_v": 7.4,
+  "notes": "dual brushed ESC with 5V BEC; ~15mA quiescent (excludes motor current and whatever the BEC passes on to the 5V rail)",
   "elec": {
     "pins": {
       "VIN": {

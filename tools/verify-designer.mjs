@@ -13,7 +13,10 @@ if (!m) fail("no script block");
 try { new Function(m[1]); } catch (e) { fail("script does not parse: " + e.message); }
 
 const count = k => (html.match(new RegExp(k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
-const exactlyOne = ["function draw() {", "function draw3()", "function syncCanvas()", "function renderExamples()", "let wireDrag = null"];
+const exactlyOne = [
+  "function draw() {", "function draw3()", "function syncCanvas()", "function renderExamples()", "let wireDrag = null",
+  "function updateRunState()", "function renderRunPanel()",
+];
 for (const k of exactlyOne) {
   if (count(k) !== 1) fail(`expected exactly one '${k}', found ${count(k)}`);
 }

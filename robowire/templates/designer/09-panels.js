@@ -112,20 +112,31 @@
       if (!byRow.has(r)) byRow.set(r, []);
       byRow.get(r).push(inst);
     }
-    // Connectivity graph: nets, buses, xshut lines.
-    const adj = new Map(insts.map(i => [i, new Set()]));
-    const link = (a, b) => {
-      if (a !== b && adj.has(a) && adj.has(b)) { adj.get(a).add(b); adj.get(b).add(a); }
+    // Connectivity graph, weighted per net by 1/(members-1): a net with many
+    // members (ground, most often) touches almost everything, so its pull on
+    // any ONE neighbor is diffuse and shouldn't dominate — letting it do so
+    // is exactly what turns into a long diagonal wire crossing unrelated
+    // boxes. A net with just two members (the common case: one specific
+    // rail between exactly these two parts) pulls at full strength, since
+    // THAT connection is the one actually worth keeping short and aligned.
+    const adj = new Map(insts.map(i => [i, new Map()]));
+    const link = (a, b, weight) => {
+      if (a === b || !adj.has(a) || !adj.has(b)) return;
+      adj.get(a).set(b, (adj.get(a).get(b) || 0) + weight);
+      adj.get(b).set(a, (adj.get(b).get(a) || 0) + weight);
     };
     for (const net of nl.nets) {
       const is = [...new Set(net.pins.map(pn => splitPin(pn)[0]))];
-      for (let i = 0; i < is.length; i++) for (let j = i + 1; j < is.length; j++) link(is[i], is[j]);
+      const weight = 1 / Math.max(1, is.length - 1);
+      for (let i = 0; i < is.length; i++) for (let j = i + 1; j < is.length; j++) link(is[i], is[j], weight);
     }
     for (const bus of nl.buses) {
       const m = splitPin(bus.sda)[0];
+      const fanout = 1 + bus.devices.length;
+      const weight = 1 / Math.max(1, fanout - 1);
       for (const d of bus.devices) {
-        link(m, d.inst);
-        if (d.xshut) link(splitPin(d.xshut)[0], d.inst);
+        link(m, d.inst, weight);
+        if (d.xshut) link(splitPin(d.xshut)[0], d.inst, weight);
       }
     }
     const cw = cv.clientWidth || 900;
@@ -136,12 +147,16 @@
     rows.forEach((r, ri) => {
       let members = byRow.get(r);
       if (ri > 0) {
-        // Barycenter: sit each component under the average x of the
-        // connections it already has above — fewer wire crossings.
+        // Weighted barycenter: sit each component under the connection-
+        // weighted average x of whatever's already placed above it.
         members = members
           .map(inst => {
-            const ns = [...(adj.get(inst) || [])].filter(n => placedX[n] !== undefined);
-            const bx = ns.length ? ns.reduce((sum, n) => sum + placedX[n], 0) / ns.length : cw / 2;
+            let wsum = 0, xsum = 0;
+            for (const [n, w] of adj.get(inst) || []) {
+              if (placedX[n] === undefined) continue;
+              wsum += w; xsum += w * placedX[n];
+            }
+            const bx = wsum > 0 ? xsum / wsum : cw / 2;
             return { inst, bx };
           })
           .sort((a, b) => a.bx - b.bx || (a.inst < b.inst ? -1 : 1))

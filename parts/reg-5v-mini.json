@@ -3,7 +3,9 @@
   "kind": "regulator",
   "mass_g": 1.0,
   "provisional": true,
-  "notes": "mini buck/linear 5V regulator, ~0.8A",
+  "current_ma": 5.0,
+  "nominal_v": 7.4,
+  "notes": "mini buck/linear 5V regulator, ~0.8A max output; ~5mA quiescent draw on its own input",
   "description": "A small 5-volt regulator: feed it raw battery voltage and it puts out a clean 5V — the safe way to power the brain when there's no ESC with a built-in BEC around.",
   "elec": {
     "pins": {

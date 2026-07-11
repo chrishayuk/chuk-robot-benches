@@ -3,7 +3,9 @@
   "kind": "mcu",
   "mass_g": 2.5,
   "provisional": true,
-  "notes": "RP2350 board; reflex organ host",
+  "current_ma": 40.0,
+  "nominal_v": 5.0,
+  "notes": "RP2350 board; reflex organ host; ~40mA typical active draw (datasheet-approximate, excludes 3V3 rail loads)",
   "elec": {
     "pins": {
       "5V": {

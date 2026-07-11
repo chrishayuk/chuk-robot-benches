@@ -107,6 +107,7 @@ version = "0.1.0"
 dependencies = [
  "robowire",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -128,15 +129,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
-]
-
-[[package]]
-name = "robowire-wasm"
-version = "0.1.0"
-dependencies = [
- "robosim",
- "robowire",
- "serde_json",
 ]
 
 [[package]]

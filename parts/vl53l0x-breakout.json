@@ -5,7 +5,9 @@
   "fov_deg": 25.0,
   "range_mm": 1200.0,
   "provisional": true,
-  "notes": "downward edge-detection ToF; dual units need XSHUT reassignment (robowire E20)",
+  "current_ma": 19.0,
+  "nominal_v": 3.3,
+  "notes": "downward edge-detection ToF; dual units need XSHUT reassignment (robowire E20); ~19mA active",
   "elec": {
     "pins": {
       "VIN": {

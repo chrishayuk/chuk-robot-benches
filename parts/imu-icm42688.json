@@ -3,7 +3,9 @@
   "kind": "imu",
   "mass_g": 1.0,
   "provisional": true,
-  "notes": "IMU breakout",
+  "current_ma": 1.0,
+  "nominal_v": 3.3,
+  "notes": "IMU breakout; ~1mA active (datasheet-typical low-power mode)",
   "elec": {
     "pins": {
       "VIN": {

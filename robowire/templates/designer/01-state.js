@@ -36,6 +36,16 @@
   let mode = "2d";
   let wireDrag = null;      // {from, cur:[x,y], moved} while dragging a wire
   let orbiting = false;
+  // Run mode (12-run.js) — declared here, not there: draw()/draw3() (07/08)
+  // read runMode/runState unconditionally, and 11-boot.js's startup tail
+  // calls draw() before module 12 has run, so these must be live before
+  // that (function declarations hoist fully; `let` does not).
+  let runMode = false;
+  let runInputs = { switches: {}, buttons: {}, throttles: {}, sensor_values: {} };
+  let runState = { nets: {}, instances: {} };
+  let heldButtonInst = null;
+  let spinPhase = 0;
+  let spinRAF = null;
   let pending = null;       // first pin clicked in wire mode
   let pickHandler = null;   // active pin-pick flow (bus/failsafe forms)
   let selNet = -1;

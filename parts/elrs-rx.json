@@ -3,7 +3,9 @@
   "kind": "radio",
   "mass_g": 1.0,
   "provisional": true,
-  "notes": "ELRS receiver, CRSF out",
+  "current_ma": 50.0,
+  "nominal_v": 5.0,
+  "notes": "ELRS receiver, CRSF out; ~50mA typical",
   "elec": {
     "pins": {
       "VIN": {

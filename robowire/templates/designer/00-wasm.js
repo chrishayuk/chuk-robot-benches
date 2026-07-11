@@ -25,3 +25,16 @@
     const out = new Uint8Array(W.memory.buffer, W.out_ptr(), W.out_len());
     return JSON.parse(dec.decode(out));
   }
+  function callRunState(netlistObj, inputsObj) {
+    const nl = enc.encode(JSON.stringify(netlistObj));
+    const ps = enc.encode(JSON.stringify(PARTS));
+    const is = enc.encode(JSON.stringify(inputsObj));
+    const p1 = W.wasm_alloc(nl.length), p2 = W.wasm_alloc(ps.length), p3 = W.wasm_alloc(is.length);
+    new Uint8Array(W.memory.buffer, p1, nl.length).set(nl);
+    new Uint8Array(W.memory.buffer, p2, ps.length).set(ps);
+    new Uint8Array(W.memory.buffer, p3, is.length).set(is);
+    W.run_state_json(p1, nl.length, p2, ps.length, p3, is.length);
+    W.wasm_free(p1, nl.length); W.wasm_free(p2, ps.length); W.wasm_free(p3, is.length);
+    const out = new Uint8Array(W.memory.buffer, W.out_ptr(), W.out_len());
+    return JSON.parse(dec.decode(out));
+  }

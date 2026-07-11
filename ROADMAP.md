@@ -48,6 +48,7 @@ cell80 (external companion spec).
 | Authentic mode (RV32 executor in-loop) | chuk-arena M2 | **gated on cell80 M2 (external)** — fast-mode results retroactively re-scored per §7 |
 | Shared derivation library (mass/CoG/hull/tip): one crate, consumed by viewer + arena-plant + robotspec | robotspec M1 = viewer M1 | one codebase, N consumers, zero drift by construction |
 | robowire M1: power-budget checks E30–32 + power graph + wiring mass into RobotSpec | robowire M1 | derived power section, no hand-entered duplicates (X03) |
+| robowire M0.5: interactive run mode, in the standalone `robosim` crate — click-to-toggle switch/button, throttle + fake-sensor controls, event-driven net energization, real Ohm's-law voltage/current per net and component (not fixed figures) | robowire M0.5 | green `run_state` test suite against the MVP wedge harness + a dedicated demo harness (switch+LED+motor+sensor+button), incl. voltage-changes-current-changes tests |
 
 ## Phase 3 — fields, search, and the AI design loop
 

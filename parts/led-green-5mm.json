@@ -3,7 +3,8 @@
   "kind": "led",
   "mass_g": 0.3,
   "provisional": true,
-  "notes": "forward ~2.2V @ 20mA",
+  "forward_v": 2.2,
+  "notes": "forward ~2.2V @ 20mA rated (actual live current = (V - forward_v) / series resistor, robowire run mode)",
   "description": "A green indicator light — same rules as its red sibling: anode in, cathode out, and always a series resistor.",
   "elec": {
     "pins": {

@@ -139,7 +139,7 @@ pub(crate) fn cmd_design(args: &[String]) {
     // The designer ships as one self-contained file but is AUTHORED as
     // components: shell + thematic JS modules, assembled here. Edit the
     // modules, never the assembled artifact.
-    const MODULES: [&str; 12] = [
+    const MODULES: [&str; 13] = [
         include_str!("../templates/designer/00-wasm.js"),
         include_str!("../templates/designer/01-state.js"),
         include_str!("../templates/designer/02-prose.js"),
@@ -152,6 +152,7 @@ pub(crate) fn cmd_design(args: &[String]) {
         include_str!("../templates/designer/09-panels.js"),
         include_str!("../templates/designer/10-io.js"),
         include_str!("../templates/designer/11-boot.js"),
+        include_str!("../templates/designer/12-run.js"),
     ];
     let script = format!(
         "(async function () {{\n  \"use strict\";\n{}\n}})();",

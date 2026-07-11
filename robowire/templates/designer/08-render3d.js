@@ -25,9 +25,16 @@
     nl.nets.forEach((net, i) => {
       const cls = netClass(net);
       if (!layerOn[cls]) return;
-      const col = COLORS[cls] || "#999";
+      let col = COLORS[cls] || "#999";
+      let flowing = false;
+      if (runMode) {
+        const ns = runState.nets && runState.nets[net.id];
+        flowing = !!(ns && ns.amps > 0.001);
+        if (flowing) col = "#57b48f"; // green — current is actually flowing here
+      }
       const selW = i === selNet;
-      for (const arc of netArcs3(net, i)) stroke3(arc, col, selW ? 3 : 1.8, false, true);
+      if (flowing) cx.lineDashOffset = -spinPhase * 14;
+      for (const arc of netArcs3(net, i)) stroke3(arc, col, selW ? 3 : 1.8, flowing, true);
     });
     for (const bus of (layerOn.i2c ? nl.buses : [])) {
       const m = pin3(bus.sda);
@@ -70,6 +77,10 @@
           cx.strokeStyle = "#6b787f"; cx.lineWidth = 1;
           cx.beginPath(); cx.arc(q2[0], q2[1], 2.8, 0, Math.PI * 2); cx.stroke();
         }
+      }
+      if (runMode) {
+        const bq = project3([g.x, g.y, g.h / 2]);
+        if (bq) drawRunOverlay3d(inst, bq);
       }
     }
     if (wireDrag && wireDrag.moved) {
