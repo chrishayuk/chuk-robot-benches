@@ -127,7 +127,7 @@
   <div id="fspins" style="margin-top:4px"></div>
 </div>
 <div id="hint"></div>
-<div id="dbg" style="position:fixed;bottom:10px;right:14px;color:var(--dim);font:10px ui-monospace,Menlo,monospace;background:color-mix(in srgb, var(--panel) 85%, transparent);padding:3px 8px;border-radius:4px">build 13dc1dc5</div>
+<div id="dbg" style="position:fixed;bottom:10px;right:14px;color:var(--dim);font:10px ui-monospace,Menlo,monospace;background:color-mix(in srgb, var(--panel) 85%, transparent);padding:3px 8px;border-radius:4px">build 078992db</div>
 <dialog id="ioDialog">
   <h2 id="ioTitle">netlist json</h2>
   <textarea id="ioText"></textarea>
@@ -211,7 +211,7 @@ const WASM_B64 =
     if (cv.width !== bw) cv.width = bw;
     if (cv.height !== bh) cv.height = bh;
     document.getElementById("dbg").textContent =
-      `build 13dc1dc5 · dpr ${dpr} · css ${w}x${h} · backing ${cv.width}x${cv.height}`;
+      `build 078992db · dpr ${dpr} · css ${w}x${h} · backing ${cv.width}x${cv.height}`;
     return true;
   }
   function resize() { if (syncCanvas()) draw(); }
@@ -824,6 +824,93 @@ const WASM_B64 =
       selInst ? `${selInst} selected — drag to move, R rotates, ✕ or Delete removes` :
       selNet >= 0 ? "net selected — Delete removes it" : "");
   }
+  function stroke3(pts, color, width, dashed, glow) {
+    cx.beginPath();
+    let started = false;
+    for (const pt of pts) {
+      const q = project3(pt);
+      if (!q) { started = false; continue; }
+      if (!started) { cx.moveTo(q[0], q[1]); started = true; }
+      else cx.lineTo(q[0], q[1]);
+    }
+    cx.strokeStyle = color; cx.lineWidth = width;
+    cx.setLineDash(dashed ? [6, 5] : []);
+    if (glow) { cx.shadowColor = color; cx.shadowBlur = 9; }
+    cx.stroke();
+    cx.shadowBlur = 0; cx.setLineDash([]);
+  }
+  function draw3() {
+    pc = planeCenter();
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
+    for (let g = -300; g <= 300; g += 60) {
+      stroke3([[pc[0] + g, pc[1] - 300, 0], [pc[0] + g, pc[1] + 300, 0]], "#151b20", 1, false, false);
+      stroke3([[pc[0] - 300, pc[1] + g, 0], [pc[0] + 300, pc[1] + g, 0]], "#151b20", 1, false, false);
+    }
+    nl.nets.forEach((net, i) => {
+      const cls = netClass(net);
+      if (!layerOn[cls]) return;
+      const col = COLORS[cls] || "#999";
+      const selW = i === selNet;
+      for (const arc of netArcs3(net, i)) stroke3(arc, col, selW ? 3 : 1.8, false, true);
+    });
+    for (const bus of (layerOn.i2c ? nl.buses : [])) {
+      const m = pin3(bus.sda);
+      if (!m) continue;
+      for (const dev of bus.devices) {
+        const d = pin3(dev.inst + ".SDA");
+        if (d) stroke3(arc3(m, d, CLASS_LIFT.i2c), COLORS.i2c, 1.8, true, true);
+      }
+    }
+    const pinColors3 = computePinColors();
+    for (const inst of Object.keys(nl.instances)) {
+      if (!instVisible(inst)) continue;
+      const g = geo3(inst);
+      const isSel = inst === selInst;
+      const col = isSel || (pending && splitPin(pending)[0] === inst) ? "#e8a33d" : "#5b6a73";
+      const c = [];
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [0, 1])
+        c.push([g.x + sx * g.W / 2, g.y + sy * g.D / 2, sz * g.h]);
+      const edges = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+      for (const [a, b] of edges) stroke3([c[a], c[b]], col, isSel ? 2 : 1.2, false, false);
+      const q = project3([g.x, g.y, g.h + 10]);
+      if (q) {
+        cx.fillStyle = isSel ? "#e8a33d" : "#c7ced2";
+        cx.font = "11px ui-monospace, Menlo, monospace";
+        cx.fillText(inst, q[0] - 12, q[1]);
+      }
+      for (const [pin, pp] of Object.entries(g.pinPos3)) {
+        const ep = inst + "." + pin;
+        const q2 = project3(pp);
+        if (!q2) continue;
+        const active = pending === ep;
+        const wired = pinColors3[ep];
+        if (active) {
+          cx.fillStyle = "#e8a33d";
+          cx.beginPath(); cx.arc(q2[0], q2[1], 5, 0, Math.PI * 2); cx.fill();
+        } else if (wired) {
+          cx.fillStyle = wired;
+          cx.beginPath(); cx.arc(q2[0], q2[1], 3.6, 0, Math.PI * 2); cx.fill();
+        } else {
+          cx.strokeStyle = "#6b787f"; cx.lineWidth = 1;
+          cx.beginPath(); cx.arc(q2[0], q2[1], 2.8, 0, Math.PI * 2); cx.stroke();
+        }
+      }
+    }
+    if (wireDrag && wireDrag.moved) {
+      const wp = pin3(wireDrag.from);
+      const sp = wp && project3(wp);
+      if (sp) {
+        cx.strokeStyle = "#e8a33d"; cx.lineWidth = 1.6; cx.setLineDash([6, 4]);
+        cx.beginPath(); cx.moveTo(sp[0], sp[1]); cx.lineTo(wireDrag.cur[0], wireDrag.cur[1]); cx.stroke();
+        cx.setLineDash([]);
+      }
+    }
+    hint(wireDrag && wireDrag.moved ? `release on a pin to connect ${wireDrag.from}` :
+      pending ? `wiring from ${pending} — click another pin, or drag from a pin (esc cancels)` :
+      pickHandler ? "pick a pin…" :
+      "3D — drag empty space to orbit, wheel to zoom; switch to 2D to rearrange");
+  }
   function roundRect(x, y, w, h, r) {
     cx.beginPath();
     cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r);
@@ -987,6 +1074,7 @@ const WASM_B64 =
   ];
   function autoArrange() {
     const insts = Object.keys(nl.instances);
+    if (!insts.length) return;
     const rowOf = inst => {
       const k = kindOf(inst);
       const idx = ARRANGE_ROWS.findIndex(r => r.includes(k));
@@ -998,18 +1086,50 @@ const WASM_B64 =
       if (!byRow.has(r)) byRow.set(r, []);
       byRow.get(r).push(inst);
     }
-    const rows = [...byRow.keys()].sort((a, b) => a - b);
+    // Connectivity graph: nets, buses, xshut lines.
+    const adj = new Map(insts.map(i => [i, new Set()]));
+    const link = (a, b) => {
+      if (a !== b && adj.has(a) && adj.has(b)) { adj.get(a).add(b); adj.get(b).add(a); }
+    };
+    for (const net of nl.nets) {
+      const is = [...new Set(net.pins.map(pn => splitPin(pn)[0]))];
+      for (let i = 0; i < is.length; i++) for (let j = i + 1; j < is.length; j++) link(is[i], is[j]);
+    }
+    for (const bus of nl.buses) {
+      const m = splitPin(bus.sda)[0];
+      for (const d of bus.devices) {
+        link(m, d.inst);
+        if (d.xshut) link(splitPin(d.xshut)[0], d.inst);
+      }
+    }
     const cw = cv.clientWidth || 900;
+    const SP = 185;
+    const placedX = {};
+    let y = 100;
+    const rows = [...byRow.keys()].sort((a, b) => a - b);
     rows.forEach((r, ri) => {
-      const members = byRow.get(r);
+      let members = byRow.get(r);
+      if (ri > 0) {
+        // Barycenter: sit each component under the average x of the
+        // connections it already has above — fewer wire crossings.
+        members = members
+          .map(inst => {
+            const ns = [...(adj.get(inst) || [])].filter(n => placedX[n] !== undefined);
+            const bx = ns.length ? ns.reduce((sum, n) => sum + placedX[n], 0) / ns.length : cw / 2;
+            return { inst, bx };
+          })
+          .sort((a, b) => a.bx - b.bx || (a.inst < b.inst ? -1 : 1))
+          .map(o => o.inst);
+      }
+      let maxH = 60;
+      for (const inst of members) maxH = Math.max(maxH, boxGeo(inst).h);
       members.forEach((inst, ci) => {
         const rot = (layout[inst] && layout[inst][2]) || 0;
-        layout[inst] = [
-          cw / 2 + (ci - (members.length - 1) / 2) * 185,
-          95 + ri * 150,
-          rot,
-        ];
+        const x = cw / 2 + (ci - (members.length - 1) / 2) * SP;
+        layout[inst] = [x, y + maxH / 2, rot];
+        placedX[inst] = x;
       });
+      y += maxH + 85;
     });
     saveLayout();
     draw();
@@ -1123,15 +1243,20 @@ const WASM_B64 =
   function renderExamples() {
     const el = document.getElementById("examples");
     el.innerHTML = "";
-    for (const ex of EXAMPLES) {
+    // Worked examples first; broken-on-purpose lessons clearly quarantined.
+    const worked = EXAMPLES.filter(ex => !ex.name.startsWith("lesson-"));
+    const lessons = EXAMPLES.filter(ex => ex.name.startsWith("lesson-"));
+    const card = (ex, lesson) => {
       const div = document.createElement("div");
       div.className = "part";
-      const lesson = ex.name.startsWith("lesson-");
+      if (lesson) div.style.borderColor = "var(--bad)";
       div.innerHTML = `<span>${ex.name.replace(/^(example|lesson)-/, "")}` +
-        `<br><span class="k">${lesson ? "lesson — deliberately broken, read the checks" : "worked example"}</span></span>`;
+        (lesson
+          ? `<br><span class="k" style="color:var(--bad);font-weight:700">⚠ BROKEN ON PURPOSE — a repair exercise</span>`
+          : `<br><span class="k" style="color:var(--ok)">works — all checks pass</span>`);
       const btn = document.createElement("button");
       btn.className = "mini";
-      btn.textContent = "load";
+      btn.textContent = lesson ? "load broken" : "load";
       btn.addEventListener("click", () => {
         if (Object.keys(nl.instances).length && !confirm("Replace the current design with '" + ex.name + "'?")) return;
         nl = JSON.parse(JSON.stringify(ex));
@@ -1141,9 +1266,20 @@ const WASM_B64 =
         selInst = null; selNet = -1; pending = null;
         refresh();
         autoArrange();
+        if (lesson) {
+          hint("⚠ this circuit is broken on purpose — read the FAIL in the checks panel, then repair it (hint: the fixed version is in the examples list)");
+        }
       });
       div.appendChild(btn);
       el.appendChild(div);
+    };
+    for (const ex of worked) card(ex, false);
+    if (lessons.length) {
+      const hd = document.createElement("div");
+      hd.style.cssText = "color:var(--bad);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;margin:8px 0 3px";
+      hd.textContent = "repair exercises (broken on purpose)";
+      el.appendChild(hd);
+      for (const ex of lessons) card(ex, true);
     }
   }
 
