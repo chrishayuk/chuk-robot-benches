@@ -1,0 +1,28 @@
+{
+  "id": "servo-9g-lifter",
+  "kind": "servo",
+  "mass_g": 9.0,
+  "provisional": true,
+  "current_ma": 200.0,
+  "nominal_v": 5.0,
+  "notes": "9g micro servo; ~200mA typical active draw (datasheet-approximate, not stall)",
+  "elec": {
+    "pins": {
+      "+": {
+        "role": "power_in",
+        "v_range": [4.8, 6.0],
+        "required": true
+      },
+      "-": {
+        "role": "gnd",
+        "required": true
+      },
+      "SIG": {
+        "role": "signal_in",
+        "signal": "pwm",
+        "required": true
+      }
+    }
+  },
+  "description": "A small hobby servo: send it a PWM position command and it holds an angle. The usual choice for a weapon lifter or flipper arm on a kit-class bot — a different current profile from a continuously-spinning drive motor, since it mostly just holds position."
+}

@@ -1,0 +1,15 @@
+{
+  "id": "connector-xt30",
+  "kind": "connector",
+  "mass_g": 1.2,
+  "provisional": true,
+  "rated_a": 30.0,
+  "notes": "XT30-style bullet connector pair, 30A rated",
+  "description": "The battery connector: a mating pair in the main power path, so the pack can be unplugged rather than desoldered. Rated for a worst-case current like any other part in the chain — an undersized connector is exactly as dangerous as an undersized wire.",
+  "elec": {
+    "pins": {
+      "P1": { "role": "passive", "required": true },
+      "P2": { "role": "passive", "required": true }
+    }
+  }
+}

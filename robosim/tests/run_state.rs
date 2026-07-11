@@ -55,6 +55,15 @@ fn set_net_volts(nl: &mut Netlist, net_id: &str, volts: f64) {
     }
 }
 
+fn set_net_wire(nl: &mut Netlist, net_id: &str, gauge_awg: u32, length_mm: f64) {
+    for net in &mut nl.nets {
+        if net.id == net_id {
+            net.gauge_awg = Some(gauge_awg);
+            net.length_mm = Some(length_mm);
+        }
+    }
+}
+
 #[test]
 fn switch_open_everything_dark() {
     let (nl, cat) = demo();
@@ -193,6 +202,32 @@ fn battery_current_is_the_sum_of_every_live_load() {
 }
 
 #[test]
+fn battery_terminal_voltage_sags_proportional_to_its_own_current() {
+    let (nl, cat) = demo();
+    let mut inputs = inputs_with_switch(true);
+    inputs.throttles.insert("m1".to_string(), 0.7);
+    let st = run_state(&nl, &cat, &inputs).unwrap();
+
+    // lipo-2s-260 declares r_internal_ohm = 0.18.
+    let batt_amps = st.instances["batt"].current_a.unwrap();
+    let expected_sag = batt_amps * 0.18;
+    let actual_sag = st.instances["batt"].sag_v.unwrap();
+    assert!(close(actual_sag, expected_sag), "sag_v = {actual_sag}, expected {expected_sag}");
+
+    // Switch off -> zero current -> zero sag, not a fixed number.
+    let idle = run_state(&nl, &cat, &inputs_with_switch(false)).unwrap();
+    assert!(close(idle.instances["batt"].sag_v.unwrap(), 0.0), "no current flowing must mean no sag");
+
+    // One-shot: the battery's OWN positive net still shows its undropped
+    // declared voltage (7.4V) even though sag_v is computed and available —
+    // the sag is a separate, additional number, not an overwrite (see
+    // `InstanceRunState.sag_v`'s doc comment for why feeding it back even
+    // one hop was deliberately rejected).
+    assert!(actual_sag > 0.0, "expect nonzero sag under this load to make the next assertion meaningful");
+    assert!(close(st.nets["vbat_sw"].volts, 7.4), "sag must not overwrite the net's own declared voltage");
+}
+
+#[test]
 fn button_gates_second_led_behind_switch() {
     let (nl, cat) = demo();
 
@@ -326,4 +361,35 @@ fn dial_default_position_is_midway_when_untouched() {
     let expected = (7.4 - 2.0) / (100.0 + (1000.0 - 100.0) * 0.5);
     let actual = st.instances["led1"].current_a.unwrap();
     assert!(close(actual, expected), "default dial current_a = {actual}, expected {expected}");
+}
+
+#[test]
+fn gauge_declared_net_shows_a_live_wire_drop() {
+    let (mut nl, cat) = demo();
+    set_net_wire(&mut nl, "v33", 26, 150.0); // 26AWG, 150mm
+    let st = run_state(&nl, &cat, &inputs_with_switch(true)).unwrap();
+
+    let v33 = &st.nets["v33"];
+    assert!(v33.amps > 0.0, "v33 should be carrying current for this to mean anything");
+    let expected_ohms = robowire::wire::awg_resistance_ohms_per_m(26).unwrap() * (150.0 / 1000.0);
+    let expected_drop = v33.amps * expected_ohms;
+    let actual_drop = v33.wire_drop_v.unwrap();
+    assert!(close(actual_drop, expected_drop), "wire_drop_v = {actual_drop}, expected {expected_drop}");
+
+    // One-shot: the drop must not have fed back into anything else. v33's
+    // OWN volts field, and led1's current, are unaffected by the drop.
+    let without = run_state(&{ let (nl, _) = demo(); nl }, &cat, &inputs_with_switch(true)).unwrap();
+    assert!(close(v33.volts, without.nets["v33"].volts), "volts must not be adjusted by wire_drop_v");
+    assert!(
+        close(st.instances["led1"].current_a.unwrap(), without.instances["led1"].current_a.unwrap()),
+        "downstream current must not be affected by the wire drop (one-shot, not iterative)"
+    );
+}
+
+#[test]
+fn net_with_no_gauge_has_no_wire_drop() {
+    let (nl, cat) = demo();
+    let st = run_state(&nl, &cat, &inputs_with_switch(true)).unwrap();
+    assert!(st.nets["v33"].amps > 0.0);
+    assert!(st.nets["v33"].wire_drop_v.is_none(), "no gauge/length declared — must not fabricate a drop");
 }

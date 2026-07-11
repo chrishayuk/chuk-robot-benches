@@ -147,6 +147,8 @@ fn planted_bare_led_fails_e33() {
         pins: vec!["r1.P2".into(), "led1.A".into()],
         volts: None,
         signal: None,
+        gauge_awg: None,
+        length_mm: None,
     });
     assert!(code_result(&nl, &cat, "E33"), "resistor in series must satisfy E33");
 }

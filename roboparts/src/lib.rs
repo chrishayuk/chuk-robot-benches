@@ -130,9 +130,11 @@ pub struct Part {
     /// and compute LIVE current via Ohm's law against whatever voltage the
     /// part actually sees, instead of reporting a fixed number. Applies to
     /// fixed-power kinds (tof/imu/mcu/esc-quiescent/regulator-quiescent/
-    /// radio/buzzer). NOT the same as robowire M1's forthcoming idle/active/
-    /// peak power-budget fields (E30-32); a single representative operating
-    /// point, datasheet-typical like the rest of a `provisional` entry.
+    /// radio/buzzer/servo). Also reused directly by robowire M1's E30/E31
+    /// worst-case power-budget checks as a documented approximation (a
+    /// single representative operating point, datasheet-typical like the
+    /// rest of a `provisional` entry — not a true peak-current figure,
+    /// which the catalogue doesn't distinguish yet).
     #[serde(default)]
     pub current_ma: Option<f64>,
     #[serde(default)]
@@ -158,6 +160,11 @@ pub struct Part {
     /// iterative nonlinear SPICE solve).
     #[serde(default)]
     pub forward_v: Option<f64>,
+    /// Rated current in amps — `fuse`/`ptc`- and `connector`-kind parts.
+    /// robowire's E30/E31 checks read this as the element's own current
+    /// limit (a fuse's own resistance is ~irrelevant next to its rating).
+    #[serde(default)]
+    pub rated_a: Option<f64>,
     #[serde(default)]
     pub provisional: bool,
     #[serde(default)]

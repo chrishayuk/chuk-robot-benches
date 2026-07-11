@@ -51,18 +51,24 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
         let (part, _) = cat.get(part_id)?;
         let Some(elec) = &part.elec else { continue };
 
-        if matches!(part.kind.as_str(), "switch" | "button" | "resistor" | "potentiometer" | "wiring") {
+        if matches!(
+            part.kind.as_str(),
+            "switch" | "button" | "resistor" | "potentiometer" | "wiring" | "fuse" | "ptc" | "connector"
+        ) {
             let pin_names: Vec<&String> = elec.pins.keys().collect();
             if pin_names.len() == 2 {
                 let closed = match part.kind.as_str() {
                     "switch" => inputs.switches.get(inst).copied().unwrap_or(false),
                     "button" => inputs.buttons.get(inst).copied().unwrap_or(false),
-                    _ => true, // resistor / potentiometer / wiring: always conducts
+                    _ => true, // resistor/potentiometer/wiring/fuse/ptc/connector: always conducts
                 };
                 // Zero-resistance (ideal) kinds carry a net's voltage across
                 // unchanged (resolve_voltages); resistor/potentiometer are a
-                // real drop and must not.
-                let zero_resistance = matches!(part.kind.as_str(), "switch" | "button" | "wiring");
+                // real drop and must not. A fuse/PTC/connector's own
+                // resistance is negligible next to what this model tracks —
+                // same approximation as wiring.
+                let zero_resistance =
+                    matches!(part.kind.as_str(), "switch" | "button" | "wiring" | "fuse" | "ptc" | "connector");
                 if closed {
                     let e0 = format!("{inst}.{}", pin_names[0]);
                     let e1 = format!("{inst}.{}", pin_names[1]);
@@ -155,7 +161,7 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
 
         if matches!(
             part.kind.as_str(),
-            "battery" | "regulator" | "esc" | "mcu" | "tof" | "imu" | "radio" | "buzzer"
+            "battery" | "regulator" | "esc" | "mcu" | "tof" | "imu" | "radio" | "buzzer" | "servo"
         ) {
             st.powered = Some(instance_powered(nl, cat, &net_of, &hot, &grounded, inst)?);
         }
@@ -163,7 +169,7 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
         match part.kind.as_str() {
             "switch" => st.closed = Some(inputs.switches.get(inst).copied().unwrap_or(false)),
             "button" => st.closed = Some(inputs.buttons.get(inst).copied().unwrap_or(false)),
-            "regulator" | "esc" | "mcu" | "radio" | "buzzer" => {
+            "regulator" | "esc" | "mcu" | "radio" | "buzzer" | "servo" => {
                 let mut amps = 0.0;
                 if st.powered == Some(true) {
                     if let Some(supply_net) = pin_net_by_role(elec, inst, &net_of, "power_in") {
@@ -331,6 +337,11 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
         // doesn't reach: a motor's PWM-driven terminals, a lit LED's own
         // (resistor-isolated) anode net.
         let live = is_hot || amps > 0.0;
+        let wire_drop_v = if amps > 0.0 {
+            robowire::wire::net_resistance_ohms(net).map(|r| amps * r)
+        } else {
+            None
+        };
         nets.insert(
             net.id.clone(),
             NetRunState {
@@ -338,12 +349,23 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
                 grounded: grounded.contains(&net.id),
                 volts: if live { resolved_volts.get(&net.id).copied().unwrap_or(0.0) } else { 0.0 },
                 amps,
+                wire_drop_v,
             },
         );
     }
 
     // Phase 6: battery's own current — the total on its own terminal net,
-    // knowable only now that `nets` (and its Σ of every sink) is built.
+    // knowable only now that `nets` (and its Σ of every sink) is built. Its
+    // terminal-voltage sag (`robowire::checks::battery_sag_v`) is derived
+    // from that same current, but is a ONE-SHOT display correction only:
+    // every other net's `volts`/`amps` above were already computed as if
+    // the battery's voltage were its undropped nominal figure, so feeding
+    // the sag back — even one hop, to something zero-resistance-bridged to
+    // the battery's own net — would show a number less consistent with the
+    // rest of the model than not showing it at all (the receiving net's
+    // `amps` was computed against the undropped voltage; propagating the
+    // drop without redoing that calculation doesn't actually make it more
+    // accurate). See `InstanceRunState.sag_v`'s doc comment.
     for (inst, part_id) in &nl.instances {
         let (part, _) = cat.get(part_id)?;
         if part.kind != "battery" {
@@ -352,8 +374,10 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
         let Some(elec) = &part.elec else { continue };
         let pos_net = pin_net_by_role(elec, inst, &net_of, "pos");
         let amps = pos_net.and_then(|n| nets.get(&n)).map(|ns| ns.amps).unwrap_or(0.0);
+        let sag_v = elec.source.as_ref().and_then(|s| robowire::checks::battery_sag_v(s, amps));
         if let Some(st) = instances.get_mut(inst) {
             st.current_a = Some(amps);
+            st.sag_v = sag_v;
         }
     }
 

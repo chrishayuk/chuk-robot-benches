@@ -12,6 +12,69 @@
   // page-load draw()), so no TDZ hazard declaring it here.
   let runRowRefs = {};
 
+  // Buzzer audio (Web Audio API) — same instance-identity discipline as
+  // runRowRefs above: an oscillator is created once per powered-on stretch
+  // and never recreated on every tick, only started/stopped on an actual
+  // false->true / true->false transition (see syncBuzzers). audioCtx is
+  // created lazily inside enterRunMode(), which only ever runs from a real
+  // click — a genuine user gesture, satisfying browser autoplay policy.
+  let audioCtx = null;
+  const buzzerOscillators = {}; // inst -> { osc, gain }
+
+  function ensureAudioCtx() {
+    if (audioCtx) return audioCtx;
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null; // no Web Audio support (or a headless test env) — silently skip
+    audioCtx = new Ctor();
+    return audioCtx;
+  }
+
+  function startBuzzer(inst) {
+    if (buzzerOscillators[inst]) return;
+    const ctx = ensureAudioCtx();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.value = 2700; // a plain "robot is alive" piezo-style tone
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.15, now + 0.01); // short ramp, no click
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    buzzerOscillators[inst] = { osc, gain };
+  }
+
+  function stopBuzzer(inst) {
+    const b = buzzerOscillators[inst];
+    if (!b) return;
+    delete buzzerOscillators[inst];
+    const now = audioCtx ? audioCtx.currentTime : 0;
+    try {
+      b.gain.gain.setValueAtTime(b.gain.gain.value, now);
+      b.gain.gain.linearRampToValueAtTime(0, now + 0.03);
+      b.osc.stop(now + 0.04);
+    } catch (e) {
+      // Already stopped/disconnected — nothing to clean up.
+    }
+  }
+
+  function stopAllBuzzers() {
+    for (const inst of Object.keys(buzzerOscillators)) stopBuzzer(inst);
+  }
+
+  function syncBuzzers(prevState) {
+    for (const [inst, partId] of Object.entries(nl.instances)) {
+      const part = partById[partId];
+      if (!part || part.kind !== "buzzer") continue;
+      const wasPowered = !!(prevState.instances || {})[inst]?.powered;
+      const isPowered = !!(runState.instances || {})[inst]?.powered;
+      if (!wasPowered && isPowered) startBuzzer(inst);
+      else if (wasPowered && !isPowered) stopBuzzer(inst);
+    }
+  }
+
   function defaultRunInputs() {
     const inputs = { switches: {}, buttons: {}, throttles: {}, dial_positions: {}, sensor_values: {} };
     for (const [inst, partId] of Object.entries(nl.instances)) {
@@ -29,7 +92,9 @@
 
   function updateRunState() {
     if (!runMode) return;
+    const prev = runState;
     runState = callRunState(nl, runInputs);
+    syncBuzzers(prev);
     renderRunPanel();
     draw();
   }
@@ -89,6 +154,11 @@
   function exitRunMode() {
     runMode = false;
     heldButtonInst = null;
+    stopAllBuzzers();
+    if (audioCtx) {
+      if (audioCtx.close) audioCtx.close();
+      audioCtx = null;
+    }
     const left = document.getElementById("left");
     left.style.pointerEvents = "";
     left.style.opacity = "";

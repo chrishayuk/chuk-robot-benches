@@ -28,6 +28,19 @@ pub struct Net {
     /// Signal class carried (signal nets): "pwm", "uart", ...
     #[serde(default)]
     pub signal: Option<String>,
+    /// Wire gauge for this net (American Wire Gauge, e.g. `26` for 26AWG),
+    /// for E31's ampacity check and robosim's live wire-drop display
+    /// (`robowire::wire`). A net's pins are still one equipotential node —
+    /// this is a lumped approximation covering the whole net (including any
+    /// fan-out to multiple pins), not a per-segment topology. `None` when
+    /// undeclared: no gauge is guessed, matching the catalogue's existing
+    /// "missing field ⇒ not computed, never fabricated" convention.
+    #[serde(default)]
+    pub gauge_awg: Option<u32>,
+    /// Total wire length for this net in millimetres, paired with
+    /// `gauge_awg` to derive resistance (`robowire::wire::net_resistance_ohms`).
+    #[serde(default)]
+    pub length_mm: Option<f64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

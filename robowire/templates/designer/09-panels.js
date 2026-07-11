@@ -92,8 +92,8 @@
   }
 
   const ARRANGE_ROWS = [
-    ["battery", "switch", "regulator"],
-    ["esc", "motor"],
+    ["battery", "connector", "fuse", "ptc", "switch", "regulator"],
+    ["esc", "motor", "servo"],
     ["mcu"],
     ["tof", "imu", "radio"],
     ["led", "resistor", "potentiometer", "buzzer", "button"],
@@ -176,8 +176,8 @@
     draw();
   }
   const PART_GROUPS = [
-    ["power", ["battery", "switch"]],
-    ["drive", ["esc", "motor"]],
+    ["power", ["battery", "switch", "connector", "fuse", "ptc"]],
+    ["drive", ["esc", "motor", "servo"]],
     ["brain", ["mcu"]],
     ["sensors", ["tof", "imu"]],
     ["radio", ["radio"]],
@@ -409,8 +409,10 @@
         ? `E-CHECK FAILURES (${fails.length}) — do not solder`
         : "HARNESS LEGAL — all checks pass";
       el.innerHTML = res.checks.map(c => {
-        const col = c.pass ? "var(--ok)" : "var(--bad)";
-        return `<div class="check"><span class="pill" style="background:${col}">${c.pass ? "PASS" : "FAIL"}</span>` +
+        const warn = c.pass && c.tier === "warn";
+        const col = !c.pass ? "var(--bad)" : warn ? "var(--accent)" : "var(--ok)";
+        const label = !c.pass ? "FAIL" : warn ? "WARN" : "PASS";
+        return `<div class="check"><span class="pill" style="background:${col}">${label}</span>` +
           `<span>${c.code}</span><span class="d">${c.detail}</span></div>`;
       }).join("");
     }, 250);

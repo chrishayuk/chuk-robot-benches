@@ -1,0 +1,12 @@
+{
+  "name": "example-3s-battery-basic",
+  "instances": { "batt": "lipo-3s-450", "sw": "power-switch-slide", "r1": "resistor-1k", "led1": "led-red-5mm" },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 11.1 },
+    { "id": "feed", "pins": ["sw.out", "r1.P1"], "volts": 11.1 },
+    { "id": "led_feed", "pins": ["r1.P2", "led1.A"] },
+    { "id": "gnd", "pins": ["led1.K", "batt.-"] }
+  ],
+  "buses": [],
+  "failsafe": null
+}

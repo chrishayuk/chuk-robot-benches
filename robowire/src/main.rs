@@ -5,7 +5,7 @@ mod cli;
 
 use cli::*;
 use robowire::catalogue::{sha256_hex, ElecCatalogue};
-use robowire::{run_checks, Netlist};
+use robowire::{run_checks, Netlist, Tier};
 use std::path::PathBuf;
 
 fn main() {
@@ -42,13 +42,12 @@ fn main() {
     println!("netlist  {}   {}", netlist.name, &netlist_hash[..16]);
     println!();
     for c in &checks {
-        println!(
-            "{} {}  {} — {}",
-            if c.pass { "PASS" } else { "FAIL" },
-            c.code,
-            c.description,
-            c.detail
-        );
+        let label = match (c.pass, c.tier) {
+            (true, Tier::Warn) => "WARN",
+            (true, Tier::Fail) => "PASS",
+            (false, _) => "FAIL",
+        };
+        println!("{label} {}  {} — {}", c.code, c.description, c.detail);
     }
     let all_pass = checks.iter().all(|c| c.pass);
     println!(

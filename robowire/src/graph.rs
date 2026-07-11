@@ -1,10 +1,11 @@
 //! Generic reachability engine — net-to-net adjacency and BFS. Nothing in
-//! this module knows what a switch or a resistor IS; `electrical.rs` and
-//! `simulate.rs` decide what gets linked and why. Kept separate so the graph
-//! traversal itself stays simple, testable, and reusable independent of any
-//! particular kind of component.
+//! this module knows what a switch or a resistor IS; `robosim`'s `electrical`/
+//! `simulate` and this crate's `power` decide what gets linked and why. Kept
+//! separate so the graph traversal itself stays simple, testable, and
+//! reusable independent of any particular kind of component or of "live" vs
+//! "worst-case" semantics.
 
-use robowire::Netlist;
+use crate::schema::Netlist;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// "inst.PIN" -> net id. If an endpoint is (illegally) wired into more than

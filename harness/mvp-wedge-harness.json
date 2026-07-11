@@ -13,15 +13,15 @@
     "rx": "elrs-rx"
   },
   "nets": [
-    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
-    { "id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 7.4 },
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4, "gauge_awg": 14, "length_mm": 40.0 },
+    { "id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 7.4, "gauge_awg": 14, "length_mm": 60.0 },
     { "id": "v5", "pins": ["esc.BEC5V", "mcu.5V", "rx.VIN"], "volts": 5.0 },
     { "id": "v33", "pins": ["mcu.3V3", "tof_l.VIN", "tof_r.VIN", "imu.VIN"], "volts": 3.3 },
     { "id": "gnd", "pins": ["batt.-", "esc.GND", "mcu.GND", "rx.GND", "tof_l.GND", "tof_r.GND", "imu.GND"] },
-    { "id": "m_l_a", "pins": ["esc.M1+", "m_l.M+"] },
-    { "id": "m_l_b", "pins": ["esc.M1-", "m_l.M-"] },
-    { "id": "m_r_a", "pins": ["esc.M2+", "m_r.M+"] },
-    { "id": "m_r_b", "pins": ["esc.M2-", "m_r.M-"] },
+    { "id": "m_l_a", "pins": ["esc.M1+", "m_l.M+"], "gauge_awg": 18, "length_mm": 70.0 },
+    { "id": "m_l_b", "pins": ["esc.M1-", "m_l.M-"], "gauge_awg": 18, "length_mm": 70.0 },
+    { "id": "m_r_a", "pins": ["esc.M2+", "m_r.M+"], "gauge_awg": 18, "length_mm": 70.0 },
+    { "id": "m_r_b", "pins": ["esc.M2-", "m_r.M-"], "gauge_awg": 18, "length_mm": 70.0 },
     { "id": "pwm_l", "pins": ["mcu.GP2", "esc.S1"], "signal": "pwm" },
     { "id": "pwm_r", "pins": ["mcu.GP3", "esc.S2"], "signal": "pwm" },
     { "id": "crsf", "pins": ["rx.TX", "mcu.GP1"], "signal": "uart" }

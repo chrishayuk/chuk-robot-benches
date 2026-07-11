@@ -16,6 +16,7 @@ const count = k => (html.match(new RegExp(k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&
 const exactlyOne = [
   "function draw() {", "function draw3()", "function syncCanvas()", "function renderExamples()", "let wireDrag = null",
   "function updateRunState()", "function renderRunPanel()",
+  "function syncBuzzers(", "function startBuzzer(", "function stopBuzzer(",
 ];
 for (const k of exactlyOne) {
   if (count(k) !== 1) fail(`expected exactly one '${k}', found ${count(k)}`);

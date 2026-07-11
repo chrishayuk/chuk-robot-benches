@@ -63,6 +63,7 @@
   const KIND_LABELS = {
     battery: "battery", switch: "switch", esc: "motor controller", mcu: "brain (MCU)",
     motor: "motors", tof: "floor sensors", imu: "motion sensor", radio: "radio", wiring: "loom allowance",
+    connector: "connector", fuse: "fuse", ptc: "resettable fuse (PTC)", servo: "servo",
   };
   const kindOn = {};
   for (const k of Object.keys(KIND_LABELS)) kindOn[k] = true;

@@ -39,6 +39,17 @@ pub struct NetRunState {
     /// unequally across parallel paths). 0.0 through the ground plane
     /// (return current isn't attributed in v1).
     pub amps: f64,
+    /// Estimated IR drop along this net's own declared wire (`Net.gauge_awg`
+    /// + `Net.length_mm`, `robowire::wire::net_resistance_ohms`) at its
+    /// current `amps` — `amps * resistance`. One-shot and NOT propagated:
+    /// every other net's `volts`/`amps` here were computed as if this drop
+    /// were zero, so this is a display annotation, not a re-solved node
+    /// voltage (feeding it back even one hop would require redoing every
+    /// downstream current calculation against the reduced voltage, which is
+    /// the iterative solve this whole model deliberately avoids). `None`
+    /// when the net declares no gauge/length, or carries no current.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wire_drop_v: Option<f64>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -64,6 +75,14 @@ pub struct InstanceRunState {
     /// it, rather than fabricated.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_a: Option<f64>,
+    /// A battery's own terminal-voltage sag under its own `current_a`
+    /// (`robowire::checks::battery_sag_v`, using the part's declared
+    /// `r_internal_ohm`) — battery instances only. One-shot, terminal-net
+    /// display only: does NOT feed back into any other net's already-computed
+    /// current (see `simulate`'s Phase 6 doc comment). `None` when the part
+    /// declares no `r_internal_ohm`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sag_v: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
 }

@@ -1,0 +1,14 @@
+{
+  "name": "example-buzzer-demo",
+  "instances": {
+    "batt": "lipo-2s-260", "sw": "power-switch-slide", "reg": "reg-5v-mini", "bz": "buzzer-active-5v"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
+    { "id": "vbat", "pins": ["sw.out", "reg.VIN"], "volts": 7.4 },
+    { "id": "v5", "pins": ["reg.OUT", "bz.+"], "volts": 5.0 },
+    { "id": "gnd", "pins": ["batt.-", "reg.GND", "bz.-"] }
+  ],
+  "buses": [],
+  "failsafe": null
+}

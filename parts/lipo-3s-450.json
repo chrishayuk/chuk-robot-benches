@@ -1,0 +1,26 @@
+{
+  "id": "lipo-3s-450",
+  "kind": "battery",
+  "mass_g": 34.0,
+  "provisional": true,
+  "notes": "3S 450mAh; higher-voltage option for stronger drive motors",
+  "elec": {
+    "pins": {
+      "+": {
+        "role": "pos",
+        "required": true
+      },
+      "-": {
+        "role": "gnd",
+        "required": true
+      }
+    },
+    "source": {
+      "volts": 11.1,
+      "c_rating": 25.0,
+      "capacity_mah": 450.0,
+      "r_internal_ohm": 0.12
+    }
+  },
+  "description": "A bigger, higher-voltage three-cell pack for builds that need more headroom than the 2S 260mAh option — more punch per motor, at the cost of more mass and a stricter voltage-range check on every downstream part."
+}

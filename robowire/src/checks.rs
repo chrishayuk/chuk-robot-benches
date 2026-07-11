@@ -8,20 +8,42 @@ use crate::schema::{split_pin, Bus, Netlist};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+/// Severity of a check result. `Warn` implies `pass == true` — a warn row
+/// never blocks the CLI's exit status or the designer's overall verdict, it
+/// only renders distinctly (specs/codes.md's "Tier" column). Only the
+/// `ok`/`fail`/`warn` constructors below should ever set this field.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Tier {
+    #[default]
+    Fail,
+    Warn,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CheckResult {
     pub code: String,
     pub description: String,
     pub pass: bool,
     pub detail: String,
+    #[serde(default)]
+    pub tier: Tier,
 }
 
-fn ok(code: &str, description: &str, detail: String) -> CheckResult {
-    CheckResult { code: code.into(), description: description.into(), pass: true, detail }
+pub(crate) fn ok(code: &str, description: &str, detail: String) -> CheckResult {
+    CheckResult { code: code.into(), description: description.into(), pass: true, detail, tier: Tier::Fail }
 }
 
-fn fail(code: &str, description: &str, detail: String) -> CheckResult {
-    CheckResult { code: code.into(), description: description.into(), pass: false, detail }
+pub(crate) fn fail(code: &str, description: &str, detail: String) -> CheckResult {
+    CheckResult { code: code.into(), description: description.into(), pass: false, detail, tier: Tier::Fail }
+}
+
+/// A non-blocking warning-tier result (specs/codes.md's "warn" tier, e.g.
+/// E22/E32/E42) — `pass` stays `true` so it never flips the CLI's `all_pass`
+/// or the designer's `fails` count, but `tier: Warn` lets both render it
+/// distinctly from a genuinely clean check.
+pub(crate) fn warn(code: &str, description: &str, detail: String) -> CheckResult {
+    CheckResult { code: code.into(), description: description.into(), pass: true, detail, tier: Tier::Warn }
 }
 
 /// Resolved pin declaration for "inst.PIN".
@@ -380,6 +402,20 @@ pub fn led_current_limited(nl: &Netlist, cat: &ElecCatalogue, inst: &str) -> Res
     Ok(limited)
 }
 
+/// A battery's terminal-voltage sag under load: `current_a * r_internal_ohm`
+/// (`SourceDecl.r_internal_ohm`) — a one-shot, non-iterative approximation,
+/// not a time-domain dynamic model (specs/robowire.md §1's "not SPICE" wall
+/// is about iterative/continuous solving, not about whether a number is
+/// static or scenario-dependent). Deliberately single-sourced here rather
+/// than duplicated in `robosim`, so a live display and any future M1
+/// power-graph/arena-plant consumer can never disagree — the same reuse
+/// discipline as `motor_output_pin`/`led_current_limited`/
+/// `bus_final_addresses` above. `None` when the part declares no
+/// `r_internal_ohm` (nothing fabricated).
+pub fn battery_sag_v(source: &crate::catalogue::SourceDecl, current_a: f64) -> Option<f64> {
+    source.r_internal_ohm.map(|r| current_a * r)
+}
+
 /// E33: every LED must see a series current limiter — a bare LED across a
 /// rail (or a GPIO) is a statically detectable dead part. Registered in
 /// specs/codes.md before this function existed, per bugs-become-rules.
@@ -481,7 +517,7 @@ pub fn e41_failsafe_chain(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResu
 
 /// The M0 composition.
 pub fn run_checks(nl: &Netlist, cat: &ElecCatalogue) -> Result<Vec<CheckResult>, String> {
-    Ok(vec![
+    let mut results = vec![
         e01_motor_channels(nl, cat)?,
         e02_rail_voltages(nl, cat)?,
         e03_polarity(nl, cat)?,
@@ -493,5 +529,7 @@ pub fn run_checks(nl: &Netlist, cat: &ElecCatalogue) -> Result<Vec<CheckResult>,
         e33_led_current_limit(nl, cat)?,
         e40_power_switch(nl, cat)?,
         e41_failsafe_chain(nl, cat)?,
-    ])
+    ];
+    results.extend(crate::power::power_checks(nl, cat)?);
+    Ok(results)
 }

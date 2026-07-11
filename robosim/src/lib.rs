@@ -8,7 +8,10 @@
 //! designer or the E-check toolchain.
 //!
 //! - `graph` — generic net-reachability (BFS over undirected/directed edges),
-//!   no electrical meaning of its own.
+//!   no electrical meaning of its own. Lives in `robowire` (its E30-E32 power
+//!   budget checks need the identical engine, and robosim already depends on
+//!   robowire, never the reverse) — re-exported here so `crate::graph::...`
+//!   call sites in `electrical`/`simulate` are unaffected by the move.
 //! - `electrical` — real-component Ohm's-law math (resistor `ohms`, LED
 //!   `forward_v`, motor winding resistance, fixed-power equivalent
 //!   resistance) — current is always derived from an actual live voltage,
@@ -18,9 +21,10 @@
 //! - `types` — the public input/output shapes.
 
 pub mod electrical;
-pub mod graph;
 pub mod simulate;
 pub mod types;
+
+pub use robowire::graph;
 
 pub use simulate::run_state;
 pub use types::{InstanceRunState, NetRunState, RunInputs, RunState};

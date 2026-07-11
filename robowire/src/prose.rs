@@ -69,6 +69,9 @@ fn who(nl: &Netlist, cat: &ElecCatalogue, inst: &str) -> String {
         "resistor" => "a resistor",
         "buzzer" => "the buzzer",
         "button" => "a push button",
+        "servo" => "a servo",
+        "connector" => "a connector",
+        "fuse" | "ptc" => "a fuse",
         _ => return format!("'{inst}'"),
     };
     format!("{noun} ({inst})")

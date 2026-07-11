@@ -1,0 +1,15 @@
+{
+  "id": "fuse-ptc-5a",
+  "kind": "ptc",
+  "mass_g": 0.6,
+  "provisional": true,
+  "rated_a": 5.0,
+  "notes": "self-resetting PTC, 5A hold current",
+  "description": "A resettable fuse in the main power path: it goes high-resistance and cuts current if the rail is ever pushed past its rating, then resets itself once things cool down. The cheap insurance against a wiring mistake or a jammed motor turning into smoke.",
+  "elec": {
+    "pins": {
+      "P1": { "role": "passive", "required": true },
+      "P2": { "role": "passive", "required": true }
+    }
+  }
+}

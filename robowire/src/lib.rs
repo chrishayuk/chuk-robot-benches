@@ -12,13 +12,16 @@
 
 pub mod catalogue;
 pub mod checks;
+pub mod graph;
+pub mod power;
 pub mod prose;
 pub mod render;
 pub mod schema;
 pub mod view;
+pub mod wire;
 
 pub const ROBOWIRE_VERSION: &str = "0.1.0-m0";
 
 pub use catalogue::{ElecCatalogue, ElecPart};
-pub use checks::{run_checks, CheckResult};
+pub use checks::{run_checks, CheckResult, Tier};
 pub use schema::Netlist;

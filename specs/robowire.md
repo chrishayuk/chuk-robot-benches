@@ -32,8 +32,13 @@ multimeter checklist that proves the built harness is the designed harness.
   receiver). When the custom reflex-organ PCB arrives, its ECAD is a *part* in the
   catalogue with declared pins; robowire wires between parts.
 - **Not a circuit simulator.** Static rule checks and worst-case budget arithmetic, not
-  SPICE. Dynamic electrical behaviour (sag under hit-spike) is arena-plant's job,
-  consuming robowire's derived graph.
+  SPICE. Time-domain dynamic electrical behaviour (a transient sag under an impact
+  spike, recovery curves) is arena-plant's job, consuming robowire's derived power
+  graph. A battery's steady-state terminal-voltage sag AT ITS CURRENT operating point
+  (`current_a * r_internal_ohm`, one-shot, not iterative — `battery_sag_v` in
+  `checks.rs`) is a deliberate, called-out exception: single-sourced in robowire so
+  both robosim's live run-mode display (§3a) and any future arena-plant/M1 power-graph
+  consumer read the identical number, never two divergent formulas.
 - **Not schematic-capture UI in v0.1.** Netlist is authored as structured text
   (reviewable, diffable, hashable — house style); the tool renders diagrams *from* it.
   Graphical editing is a v2 question, not a v1 promise.
@@ -145,9 +150,18 @@ dynamics, no timeline/trace, no firmware execution. Every net's hot/grounded sta
 event-driven boolean propagation over a kind/role-gated reachability graph:
 switch/button open/closed (user input), regulator/ESC-BEC/MCU-3V3-out passthrough
 (gated on the instance's own ground actually being connected), resistor/wiring
-always-conducting, seeded from the battery. arena-plant's dynamic sag/brownout
-behaviour remains strictly downstream and out of scope here; run mode doesn't depend on
-the power graph (§4 item 1, not yet built).
+always-conducting, seeded from the battery. arena-plant's *time-domain* dynamic
+sag/brownout behaviour (a transient dip and recovery curve under an impact spike)
+remains strictly downstream and out of scope here; run mode doesn't depend on the power
+graph (§4 item 1, not yet built). The one deliberate exception (§1): a battery's
+steady-state terminal-voltage sag at its *current* operating point is shown live
+(`InstanceRunState.sag_v`), computed by the same single-sourced `battery_sag_v` helper
+E30's static budget arithmetic could also use — not a re-derivation, and not the
+transient behaviour the paragraph above still excludes. Likewise, a net's declared wire
+gauge/length (`Net.gauge_awg`/`length_mm`) yields a live, one-shot IR-drop annotation
+(`NetRunState.wire_drop_v`) alongside E31's static ampacity check — both display-only,
+neither feeds back into any other net's already-computed current or voltage (that would
+require re-solving the whole graph, the iterative step this model exists to avoid).
 
 **Every electrical value is real component math, never a fixed lookup.** Each net
 carries a live **voltage**: its own schema-declared `Net.volts` when directly authored,
@@ -230,8 +244,13 @@ rather than a guess.
   the MVP wedge harness and dedicated demo harnesses exercising
   switch+LED+motor+sensor+button and a potentiometer dimmer,
   including tests proving current changes when voltage does.*
-- **M1:** power budget checks (E30–E32) + power graph derivation into RobotSpec; wiring
-  mass derivation.
+- **M1:** power budget checks (E30–E32) — done: worst-case per-rail draw vs battery
+  C-rating/regulator `max_a`, wire gauge vs an AWG ampacity table (`Net.gauge_awg`/
+  `length_mm`), MCU/motor-rail brownout topology warning — plus a live, one-shot wire
+  IR-drop and battery terminal-voltage sag shown in run mode (§3a), single-sourced from
+  the same helpers. Still open: power graph derivation into RobotSpec's `power:` section
+  and wiring mass roll-up (§4 items 1–2) — `power.rs`'s internal per-rail/per-net
+  reachability is shaped to become that artifact, but the artifact itself isn't built.
 - **M2:** diagram render (SVG) + generated bench verification procedure; first physical
   harness verified against its checklist (the electrical as-built ritual goes live).
 - **M3:** arena-plant consumes the power graph — first brownout scenario runs against a
