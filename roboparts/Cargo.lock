@@ -102,35 +102,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "robotspec"
-version = "0.1.0"
-dependencies = [
- "roboparts",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "robowire"
-version = "0.1.0"
-dependencies = [
- "roboparts",
- "robotspec",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "robowire-wasm"
-version = "0.1.0"
-dependencies = [
- "robowire",
- "serde_json",
-]
-
-[[package]]
 name = "serde"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"

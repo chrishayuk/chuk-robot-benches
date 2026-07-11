@@ -80,10 +80,11 @@
       const net = nl.nets[selNet];
       const cls = netClass(net);
       el.style.display = "block";
+      const np = netProse(net.id);
       el.innerHTML =
         `<b>${net.id}</b> <span class="chip" style="background:${COLORS[cls] || "#999"}">${LAYER_LABELS[cls] || cls}</span>` +
-        `<div class="about">${wireAbout(net)}</div>` +
-        `<ul>` + net.pins.map(pn => `<li>· ${pn} — ${roleText(decl(pn)) || "?"}</li>`).join("") + `</ul>`;
+        `<div class="about">${np.about}</div>` +
+        `<ul>` + (np.ends.length ? np.ends : net.pins).map(x => `<li>· ${x}</li>`).join("") + `</ul>`;
     } else {
       el.style.display = "none";
       el.innerHTML = "";
@@ -377,6 +378,7 @@
   function runChecksSoon() {
     clearTimeout(checkTimer);
     checkTimer = setTimeout(() => {
+      updateProse();
       const res = callChecks(nl);
       const verdict = document.getElementById("verdict");
       const el = document.getElementById("checks");

@@ -137,41 +137,7 @@ fn resolve_positions(
     Ok(out)
 }
 
-fn role_text(d: &crate::catalogue::PinDecl) -> String {
-    match d.role.as_str() {
-        "pos" => "battery positive terminal".into(),
-        "gnd" => "ground".into(),
-        "power_in" => match d.v_range {
-            Some([lo, hi]) => format!("power input (rated {lo}–{hi} V)"),
-            None => "power input".into(),
-        },
-        "power_out" => format!(
-            "regulator output ({} V{})",
-            d.volts.unwrap_or(0.0),
-            d.max_a.map(|a| format!(", max {a} A")).unwrap_or_default()
-        ),
-        "switch_in" => "master switch input (E40 main path)".into(),
-        "switch_out" => "master switch output".into(),
-        "motor_in" => "motor terminal".into(),
-        "motor_out" => format!(
-            "driver output{}",
-            d.channel.as_ref().map(|c| format!(" (channel {c})")).unwrap_or_default()
-        ),
-        "signal_in" => format!(
-            "signal input{}",
-            d.signal.as_ref().map(|s| format!(" ({s})")).unwrap_or_default()
-        ),
-        "signal_out" => format!(
-            "signal output{}",
-            d.signal.as_ref().map(|s| format!(" ({s})")).unwrap_or_default()
-        ),
-        "mcu_io" => format!("MCU pin [{}]", d.caps.clone().unwrap_or_default().join(", ")),
-        "bus_sda" => "I2C data (SDA)".into(),
-        "bus_scl" => "I2C clock (SCL)".into(),
-        "gpio_in" => "control input".into(),
-        other => other.into(),
-    }
-}
+use crate::prose::role_text;
 
 fn class_carries(class: &str, volts: Option<f64>) -> String {
     match class {

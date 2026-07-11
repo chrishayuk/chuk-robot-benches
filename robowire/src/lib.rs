@@ -6,6 +6,7 @@
 
 pub mod catalogue;
 pub mod checks;
+pub mod prose;
 pub mod render;
 pub mod schema;
 pub mod view;

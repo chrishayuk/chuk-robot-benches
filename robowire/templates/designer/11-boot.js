@@ -83,7 +83,7 @@
         if (bus.sda === hoverPin || bus.scl === hoverPin) nets.push(bus.id);
         for (const d of bus.devices) if (d.xshut === hoverPin) nets.push("XSHUT " + d.inst);
       }
-      hint(`${hoverPin} — ${roleText(decl(hoverPin)) || "?"}${nets.length ? " · on " + nets.join(", ") : " · unwired"}`);
+      hint(`${hoverPin} — ${pinProse(hoverPin) || "?"}${nets.length ? " · on " + nets.join(", ") : " · unwired"}`);
     }
   });
   cv.addEventListener("pointerup", e => {

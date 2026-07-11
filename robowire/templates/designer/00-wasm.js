@@ -14,4 +14,14 @@
     const out = new Uint8Array(W.memory.buffer, W.out_ptr(), W.out_len());
     return JSON.parse(dec.decode(out));
   }
-
+  function callDescribe(netlistObj) {
+    const nlB = enc.encode(JSON.stringify(netlistObj));
+    const psB = enc.encode(JSON.stringify(PARTS));
+    const p1 = W.wasm_alloc(nlB.length), p2 = W.wasm_alloc(psB.length);
+    new Uint8Array(W.memory.buffer, p1, nlB.length).set(nlB);
+    new Uint8Array(W.memory.buffer, p2, psB.length).set(psB);
+    W.describe_json(p1, nlB.length, p2, psB.length);
+    W.wasm_free(p1, nlB.length); W.wasm_free(p2, psB.length);
+    const out = new Uint8Array(W.memory.buffer, W.out_ptr(), W.out_len());
+    return JSON.parse(dec.decode(out));
+  }

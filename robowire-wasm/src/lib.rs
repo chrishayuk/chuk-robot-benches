@@ -79,3 +79,36 @@ pub extern "C" fn out_ptr() -> *const u8 {
 pub extern "C" fn out_len() -> usize {
     OUT.lock().unwrap().len()
 }
+
+/// Plain-English descriptions for the current netlist (pins + nets), from
+/// the SAME prose generator the native tools use. Output via out_ptr/len.
+///
+/// # Safety
+/// Pointers must reference `len` bytes of valid UTF-8 written by the caller.
+#[no_mangle]
+pub unsafe extern "C" fn describe_json(
+    nl_ptr: *const u8,
+    nl_len: usize,
+    parts_ptr: *const u8,
+    parts_len: usize,
+) -> i32 {
+    let nl_bytes = std::slice::from_raw_parts(nl_ptr, nl_len);
+    let parts_bytes = std::slice::from_raw_parts(parts_ptr, parts_len);
+    let netlist: Netlist = match serde_json::from_slice(nl_bytes) {
+        Ok(n) => n,
+        Err(e) => {
+            set_out(format!("{{\"error\":{}}}", serde_json::to_string(&format!("netlist: {e}")).unwrap()));
+            return 1;
+        }
+    };
+    let parts: Vec<ElecPart> = match serde_json::from_slice(parts_bytes) {
+        Ok(p) => p,
+        Err(e) => {
+            set_out(format!("{{\"error\":{}}}", serde_json::to_string(&format!("parts: {e}")).unwrap()));
+            return 1;
+        }
+    };
+    let cat = ElecCatalogue::from_values(parts);
+    set_out(robowire::prose::describe(&netlist, &cat).to_string());
+    0
+}
