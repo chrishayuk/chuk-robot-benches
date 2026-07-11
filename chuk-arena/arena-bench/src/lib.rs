@@ -2,6 +2,8 @@
 //! (§4.2) and dyno bench (§4.1). Benches are pure parameter sweeps: no RNG,
 //! fully deterministic, reports carry version tags and a PASS/FINDING verdict.
 
+pub mod edge;
+
 use arena_cells::{ActiveBrakeCell, ACTIVE_BRAKE_CELL_VERSION, ARENA_CELLS_VERSION};
 use arena_core::{Vec2, DECIMATION, GRAVITY, WORLD_DT, WORLD_HZ};
 use arena_plant::dynamic::{DynamicPlant, RigidBotSpec, RigidState, DYNAMIC_PLANT_VERSION};

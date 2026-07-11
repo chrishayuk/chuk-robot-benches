@@ -34,9 +34,9 @@ cell80 (external companion spec).
 
 | Item | Owner spec | Gate |
 |---|---|---|
-| Edge bench §4.5 on the dynamic plant (episode machine generalized; counterexample-trace export) | chuk-arena M1 | zero losses across μ band for the certified kernel; any loss exports a trace |
-| robowire M0: netlist format + parts catalogue (MVP BOM ~10 parts) + checks E01–04, E10–11, E20–21, E40–41 | robowire M0 | **adversarial acceptance:** MVP harness passes AND planted faults (swapped polarity, dual-0x29, missing switch) fail with correct E-codes |
-| RobotSpec M0: schema v0.1 freeze, parametric mode, viewer hand-schema migrated | robotspec M0 | MVP wedge exists as a hashed RobotSpec cited by inspector + first arena episode |
+| ✅ Edge bench §4.5 on the dynamic plant, against the BOUND robot | chuk-arena M1 | **done 2026-07-11:** 0/200 certified losses across the μ band (unprotected 200/200 — pressure confirmed); known limitation: worst-case boundary intrusion to 13mm CoG-to-edge via veto-state scrub drift, watched for §4.7 |
+| ✅ robowire M0 + schematic + 3D harness view w/ inspector | robowire M0 | **done:** HARNESS LEGAL, planted faults fail with correct E-codes |
+| RobotSpec M0: schema v0.1 freeze, parametric mode (✅ hashed robot + arena episode citing it; ⏳ viewer prototype into repo) | robotspec M0 | MVP wedge exists as a hashed RobotSpec cited by inspector + first arena episode |
 | Viewer prototype into repo (`robotspec-viewer/`) | robotspec-viewer | file lands, provisional flag on its private derivation copy |
 
 ## Phase 2 — organs share one truth

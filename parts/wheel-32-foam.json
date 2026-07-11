@@ -6,5 +6,10 @@
   "wheel_width_mm": 8.0,
   "provisional": true,
   "notes": "32mm foam wheel + hub",
-  "description": "A foam drive wheel. Grip is the whole game at this weight class."
+  "description": "A foam drive wheel. Grip is the whole game at this weight class.",
+  "tyre": {
+    "mu_min": 0.4,
+    "mu_max": 0.7,
+    "mu_kinetic_ratio": 0.85
+  }
 }

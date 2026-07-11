@@ -65,6 +65,10 @@ pub struct RigidBotSpec {
     pub mu_kinetic_ratio: f64,
     /// Rolling resistance coefficient (force = c_rr · N per wheel).
     pub c_rr: f64,
+    /// Fraction of the robot's weight carried by the driven wheels (the rest
+    /// rides on skids). 1.0 for all-wheel bots; derived from support
+    /// geometry when bound from a RobotSpec.
+    pub wheel_load_fraction: f64,
 }
 
 impl RigidBotSpec {
@@ -96,6 +100,7 @@ impl RigidBotSpec {
             mu_max: 0.7,
             mu_kinetic_ratio: 0.85,
             c_rr: 0.015,
+            wheel_load_fraction: 1.0,
         }
     }
 
@@ -174,7 +179,7 @@ impl DynamicPlant {
         let (cos_h, sin_h) = (st.heading.cos(), st.heading.sin());
         let fwd = Vec2::new(cos_h, sin_h);
         let left = Vec2::new(-sin_h, cos_h);
-        let n_load = s.mass_kg * GRAVITY / s.wheels.len() as f64;
+        let n_load = s.mass_kg * GRAVITY * s.wheel_load_fraction / s.wheels.len() as f64;
         let m_share = s.mass_kg / s.wheels.len() as f64;
 
         let mut force = Vec2::ZERO;

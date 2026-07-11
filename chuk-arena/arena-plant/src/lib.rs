@@ -5,6 +5,7 @@
 use arena_core::{Vec2, GRAVITY};
 use serde::{Deserialize, Serialize};
 
+pub mod bind;
 pub mod dynamic;
 
 /// Version of the M0 kinematic path — unchanged so the banked M0 corpus

@@ -16,5 +16,10 @@
       }
     }
   },
-  "description": "A geared drive motor. It spins one wheel: drive both motors the same way to go straight, opposite ways to spin on the spot."
+  "description": "A geared drive motor. It spins one wheel: drive both motors the same way to go straight, opposite ways to spin on the spot.",
+  "motor": {
+    "stall_torque_mnm": 20.0,
+    "no_load_rpm": 1000.0,
+    "stall_current_a": 1.6
+  }
 }

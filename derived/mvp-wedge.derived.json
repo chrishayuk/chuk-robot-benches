@@ -2,16 +2,16 @@
   "pipeline_version": "derive-v0.1.0-parametric",
   "schema_version": "robotspec-v0.1",
   "resolved_parts": {
-    "bbb-dual-esc": "720fe22b60d5e36cf9e4fd7cab9a53e483884eae33d89720af374834e690f5a0",
-    "elrs-rx": "de9500edc700675be68ce1e4da3871905d82628e923aed0ca8efb95d810fa2fe",
-    "harness-allowance": "6687bc52a11f4f10b098bec86559c5bb261f247fe3cf84a709f7ea0190ec8769",
-    "imu-icm42688": "529cf56a7215a15ca715dfef976896159bfffa2607e08d6a9641bb211cf0e709",
-    "lipo-2s-260": "20a1dd2b560ef962ed9b3f93ae20acecac1910ec9a532cec7b55efc436d15aea",
-    "n20-motor-6v": "f64b55ea7e5bee35bea3fcdb8f2016376f217ce18e10cc9ce6ba2d3de5f221dd",
-    "power-switch-slide": "b781d4c6cc2c5882f485d041e2ab537deca96782087c9512a1d358f6e6630361",
-    "rp2350-zero": "21f15b8bcb3bfde1d2f89c67212992e1f3ad6510d29cdc98d1001b92fabfbc15",
-    "vl53l0x-breakout": "93583f7a8d8a062d6aedbfc01dbac66a61bdc48b7871e5fb97a3f59355975328",
-    "wheel-32-foam": "fd4886009c8cfda2db9c4bc895672d8580df676d2ec73ee0ec56ed0639bb0639"
+    "bbb-dual-esc": "f15f51643ac411652040bff8eaa2f29740b889fcf567760a40b69530a34210b4",
+    "elrs-rx": "054222bafbef2531d6dfde0364d877110590cbcb84db2fb5c7030579990735f0",
+    "harness-allowance": "3b41ec86b661403cb143f332e01aad3e73aa53624091bd0d13cd69cae985c8e6",
+    "imu-icm42688": "88e576d5d10ac2e58ce2b1bffd5d7c400d98cf80e407235bcaf1eea4b68660da",
+    "lipo-2s-260": "40b6e2c6f9368ca873a100afc631f611a9c7855b7f28aa08b781b03a8efd5767",
+    "n20-motor-6v": "aa6ffdae1a9894282dcea92202ccb8610edfd187d0085102a9a0d204b62e14e6",
+    "power-switch-slide": "5c95f31dae85c873e03020d2e682763b0ab3138f9d54b7ae22ec5f7bb990e298",
+    "rp2350-zero": "a5ad65c2af2bc94269e1086bc6b7f2b8e1a88a9832bdfea0a4ed36806725801f",
+    "vl53l0x-breakout": "aa3b62a38126fb9a2e7187583e376681ed87eaeb76f870b35c1d7e9b5810ac97",
+    "wheel-32-foam": "f26c420eb5461e807c92d85f9c869330fd687371a8d4161324bc789e29b29e51"
   },
   "mass_total_g": 100.93538198424494,
   "mass_chassis_g": 41.93538198424494,
@@ -82,6 +82,6 @@
       "detail": "all mass/CoG/inertia/geometry quantities computed by this pipeline"
     }
   ],
-  "body_hash": "e26cfbef71533ee8dbca3d6428b7622def01fb3ae02f9f46aca5aa52952783a3",
-  "robot_hash": "1da969839c7eb538b2009a349b09e9a5dd58570d0b5e29ed9f4650f2b2738c41"
+  "body_hash": "13d9db5bca2f483eda54470a18883363e415266fde8c96d3658928ad3fd81787",
+  "robot_hash": "e823a6e502da8bb3e1f7a4faff0409d8e144abd14b4688c3b85514641cf7a2e3"
 }

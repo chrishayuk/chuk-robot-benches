@@ -30,6 +30,7 @@ dependencies = [
 name = "arena-bench"
 version = "0.1.0"
 dependencies = [
+ "arena-agents",
  "arena-cells",
  "arena-core",
  "arena-plant",
@@ -53,6 +54,7 @@ dependencies = [
  "arena-bench",
  "arena-cells",
  "arena-diff",
+ "arena-plant",
  "arena-store",
  "arena-tourney",
  "serde_json",
@@ -80,7 +82,9 @@ name = "arena-plant"
 version = "0.1.0"
 dependencies = [
  "arena-core",
+ "robotspec",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -515,6 +519,15 @@ name = "rawpointer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
+
+[[package]]
+name = "robotspec"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
 
 [[package]]
 name = "robust"

@@ -7,6 +7,36 @@ use std::path::Path;
 
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct MotorProps {
+    pub stall_torque_mnm: f64,
+    pub no_load_rpm: f64,
+    pub stall_current_a: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct TyreProps {
+    pub mu_min: f64,
+    pub mu_max: f64,
+    pub mu_kinetic_ratio: f64,
+}
+
+/// Partial mirror of the electrical section (robowire owns the full view);
+/// robotspec reads only what plant binding needs — same file bytes, same
+/// content hash, no duplication of the value itself.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+pub struct ElecInfo {
+    #[serde(default)]
+    pub source: Option<SourceInfo>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct SourceInfo {
+    pub volts: f64,
+    #[serde(default)]
+    pub r_internal_ohm: Option<f64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Part {
     pub id: String,
     pub kind: String,
@@ -19,6 +49,12 @@ pub struct Part {
     pub fov_deg: Option<f64>,
     #[serde(default)]
     pub range_mm: Option<f64>,
+    #[serde(default)]
+    pub motor: Option<MotorProps>,
+    #[serde(default)]
+    pub tyre: Option<TyreProps>,
+    #[serde(default)]
+    pub elec: Option<ElecInfo>,
     #[serde(default)]
     pub provisional: bool,
     #[serde(default)]

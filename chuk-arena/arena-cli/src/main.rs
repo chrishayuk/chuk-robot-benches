@@ -223,7 +223,48 @@ fn cmd_bench(args: &[String]) {
             }))
             .unwrap()
         }
-        _ => die("usage: arena bench <envelope|dyno> [--out F]"),
+        Some("edge") => {
+            let robot = flag_value(args, "--robot")
+                .unwrap_or_else(|| "../robots/mvp-wedge.json".into());
+            let parts = flag_value(args, "--parts").unwrap_or_else(|| "../parts".into());
+            let n = parse_u64(args, "--n", 200);
+            let seed = parse_u64(args, "--seed", 1);
+            let duration = parse_f64(args, "--duration", 45.0);
+            let bound = arena_plant::bind::bind_robot_from_files(
+                std::path::Path::new(&robot),
+                std::path::Path::new(&parts),
+            )
+            .unwrap_or_else(|e| die(&format!("binding {robot}: {e}")));
+            for note in &bound.notes {
+                eprintln!("bind: {note}");
+            }
+            let trace_dir = flag_value(args, "--traces").map(std::path::PathBuf::from);
+            if let Some(d) = &trace_dir {
+                std::fs::create_dir_all(d).ok();
+            }
+            let input = arena_bench::edge::EdgeBenchInput {
+                spec: &bound.spec,
+                robot_name: bound.spec.name.clone(),
+                robot_hash: bound.robot_hash.clone(),
+                body_hash: bound.body_hash.clone(),
+                kernel_ref: bound.kernel_ref.clone(),
+            };
+            let report = arena_bench::edge::edge_bench(
+                &input,
+                n,
+                seed,
+                duration,
+                trace_dir.as_deref(),
+            );
+            eprintln!("robot {} ({})", report.robot.name, &report.robot.robot_hash[..16]);
+            eprintln!("{}", report.verdict);
+            serde_json::to_string_pretty(&serde_json::json!({
+                "bench": "edge-4.5",
+                "report": report,
+            }))
+            .unwrap()
+        }
+        _ => die("usage: arena bench <envelope|dyno|edge> [--robot F --parts DIR --n N] [--out F]"),
     };
     if let Some(path) = flag_value(args, "--out") {
         std::fs::write(&path, &json)
