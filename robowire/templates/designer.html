@@ -215,6 +215,7 @@ const WASM_B64 =
   function pinXY(ep) {
     const [inst, pin] = splitPin(ep);
     if (!(inst in nl.instances)) return null;
+    if (!instVisible(inst)) return null;
     const g = boxGeo(inst);
     return g.pinPos[pin] || null;
   }
@@ -230,9 +231,71 @@ const WASM_B64 =
   };
   const layerOn = {};
   for (const k of Object.keys(LAYER_LABELS)) layerOn[k] = true;
+  const KIND_LABELS = {
+    battery: "battery", switch: "switch", esc: "motor controller", mcu: "brain (MCU)",
+    motor: "motors", tof: "floor sensors", imu: "motion sensor", radio: "radio", wiring: "loom allowance",
+  };
+  const kindOn = {};
+  for (const k of Object.keys(KIND_LABELS)) kindOn[k] = true;
+  let isolate = false;
+  function kindOf(inst) { return partById[nl.instances[inst]]?.kind || "other"; }
+  function connectedTo(a) {
+    const set = new Set([a]);
+    const prefix = a + ".";
+    for (const net of nl.nets) {
+      if (net.pins.some(p => p.startsWith(prefix))) {
+        for (const p of net.pins) set.add(splitPin(p)[0]);
+      }
+    }
+    for (const bus of nl.buses) {
+      const onBus = bus.devices.some(d => d.inst === a) ||
+        bus.sda.startsWith(prefix) || bus.scl.startsWith(prefix) ||
+        bus.devices.some(d => d.xshut && d.xshut.startsWith(prefix));
+      if (onBus) {
+        set.add(splitPin(bus.sda)[0]);
+        for (const d of bus.devices) {
+          set.add(d.inst);
+          if (d.xshut) set.add(splitPin(d.xshut)[0]);
+        }
+      }
+    }
+    return set;
+  }
+  function focusSet() {
+    if (!isolate) return null;
+    if (selInst) return connectedTo(selInst);
+    if (selNet >= 0 && nl.nets[selNet]) {
+      const set = new Set();
+      for (const p of nl.nets[selNet].pins) set.add(splitPin(p)[0]);
+      return set;
+    }
+    return null;
+  }
+  let currentFocus = null; // recomputed per draw
+  function instVisible(inst) {
+    if (kindOn[kindOf(inst)] === false) return false;
+    if (currentFocus && !currentFocus.has(inst)) return false;
+    return true;
+  }
   function renderLayers() {
     const el = document.getElementById("layerToggles");
     el.innerHTML = "";
+    const iso = document.createElement("label");
+    iso.className = "ck";
+    iso.style.marginBottom = "6px";
+    const isoInp = document.createElement("input");
+    isoInp.type = "checkbox"; isoInp.checked = isolate;
+    isoInp.addEventListener("change", () => { isolate = isoInp.checked; draw(); });
+    const isoTag = document.createElement("span");
+    isoTag.style.cssText = "color:var(--accent);font-weight:700";
+    isoTag.textContent = "isolate";
+    iso.append(isoInp, isoTag, document.createTextNode(" selection + its wiring"));
+    el.appendChild(iso);
+
+    const wiresHd = document.createElement("div");
+    wiresHd.style.cssText = "color:var(--dim);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;margin:4px 0 2px";
+    wiresHd.textContent = "wires";
+    el.appendChild(wiresHd);
     for (const [k, label] of Object.entries(LAYER_LABELS)) {
       const lab = document.createElement("label");
       lab.className = "ck";
@@ -241,6 +304,25 @@ const WASM_B64 =
       inp.addEventListener("change", () => { layerOn[k] = inp.checked; draw(); });
       const sw = document.createElement("span");
       sw.style.cssText = "width:14px;height:3px;border-radius:2px;display:inline-block;background:" + (COLORS[k] || "#999");
+      lab.append(inp, sw, document.createTextNode(label));
+      el.appendChild(lab);
+    }
+    const compHd = document.createElement("div");
+    compHd.style.cssText = "color:var(--dim);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;margin:8px 0 2px";
+    compHd.textContent = "components";
+    el.appendChild(compHd);
+    for (const [k, label] of Object.entries(KIND_LABELS)) {
+      const lab = document.createElement("label");
+      lab.className = "ck";
+      const inp = document.createElement("input");
+      inp.type = "checkbox"; inp.checked = kindOn[k];
+      inp.addEventListener("change", () => {
+        kindOn[k] = inp.checked;
+        if (selInst && !inp.checked && kindOf(selInst) === k) { selInst = null; }
+        draw();
+      });
+      const sw = document.createElement("span");
+      sw.style.cssText = "width:14px;height:10px;border:1px solid #77848c;border-radius:2px;display:inline-block";
       lab.append(inp, sw, document.createTextNode(label));
       el.appendChild(lab);
     }
@@ -304,6 +386,7 @@ const WASM_B64 =
   }
 
   function draw() {
+    currentFocus = focusSet();
     cx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
     // grid
@@ -348,6 +431,7 @@ const WASM_B64 =
 
     // boxes
     for (const inst of Object.keys(nl.instances)) {
+      if (!instVisible(inst)) continue;
       const g = boxGeo(inst);
       cx.fillStyle = "#1a2126";
       const isSel = inst === selInst;
@@ -399,6 +483,7 @@ const WASM_B64 =
   // ---- interactions ----------------------------------------------------------
   function pinAt(mx, my) {
     for (const inst of Object.keys(nl.instances)) {
+      if (!instVisible(inst)) continue;
       const g = boxGeo(inst);
       for (const [pin, [px, py]] of Object.entries(g.pinPos)) {
         if (Math.hypot(mx - px, my - py) < 8) return inst + "." + pin;
@@ -408,6 +493,7 @@ const WASM_B64 =
   }
   function instAt(mx, my) {
     for (const inst of Object.keys(nl.instances).reverse()) {
+      if (!instVisible(inst)) continue;
       const g = boxGeo(inst);
       if (Math.abs(mx - g.x) < BOXW / 2 && Math.abs(my - g.y) < g.h / 2) return inst;
     }
