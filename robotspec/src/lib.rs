@@ -12,6 +12,7 @@ pub mod checks;
 pub mod derive;
 pub mod geom;
 pub mod identity;
+pub mod power;
 pub mod schema;
 pub mod view;
 
@@ -27,4 +28,5 @@ pub const WEIGHT_LIMIT_G: f64 = 150.0;
 pub use catalogue::{Catalogue, Part};
 pub use checks::CheckResult;
 pub use derive::{derive, DerivedRecord};
+pub use power::{PowerChain, PowerGraph, PowerRail, WireSegment};
 pub use schema::*;

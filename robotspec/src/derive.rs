@@ -7,6 +7,7 @@ use crate::catalogue::Catalogue;
 use crate::checks::{run_checks, CheckResult};
 use crate::geom::{dist_point_to_segment, polygon_area_centroid};
 use crate::identity::identity_hashes;
+use crate::power::PowerGraph;
 use crate::schema::{MechSource, RobotSpec, WedgeChassis};
 use crate::{DERIVATION_PIPELINE_VERSION, GRAVITY, SCHEMA_VERSION};
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,15 @@ pub struct DerivedRecord {
     pub mass_total_g: f64,
     pub mass_chassis_g: f64,
     pub mass_parts_g: f64,
+    /// Wiring loom mass (copper conductor + connector/fuse parts), derived
+    /// from a netlist's declared wire gauge/length — `robowire::power_graph`
+    /// computes this and folds it into `mass_total_g`/`budget_margin_g` via
+    /// `attach_power_graph`, since `robotspec` has no netlist type of its
+    /// own to derive it from. `0.0` (and `power: None`) for a bare
+    /// `derive()` call — this field is purely additive, `derive()`'s own
+    /// mass math is unchanged by its existence.
+    #[serde(default)]
+    pub mass_wiring_g: f64,
     pub budget_margin_g: f64,
     pub cog_mm: [f64; 3],
     /// Yaw inertia about the CoG, g·mm² (point-mass + plate approximation, v0).
@@ -36,6 +46,11 @@ pub struct DerivedRecord {
     pub checks: Vec<CheckResult>,
     pub body_hash: String,
     pub robot_hash: String,
+    /// The power graph (rails/segments/chains) — see `mass_wiring_g`'s doc
+    /// comment; `None` for a bare `derive()` call, populated by
+    /// `robowire::power_graph::attach_power_graph`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power: Option<PowerGraph>,
 }
 
 /// A point mass in the roll-up (chassis plate or placed part).
@@ -250,6 +265,7 @@ pub fn derive(spec: &RobotSpec, cat: &Catalogue) -> Result<DerivedRecord, String
         mass_total_g: mass_total,
         mass_chassis_g: mass_chassis,
         mass_parts_g: mass_total - mass_chassis,
+        mass_wiring_g: 0.0,
         budget_margin_g: crate::WEIGHT_LIMIT_G - mass_total,
         cog_mm: cog,
         yaw_inertia_gmm2: yaw,
@@ -265,5 +281,6 @@ pub fn derive(spec: &RobotSpec, cat: &Catalogue) -> Result<DerivedRecord, String
         checks,
         body_hash,
         robot_hash,
+        power: None,
     })
 }

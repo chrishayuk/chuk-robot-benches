@@ -22,7 +22,7 @@
     },
     "elec": {
       "ref": "harness/mvp-wedge-harness.json",
-      "hash": "2b91fbc4114978a404f688d0664fa85e6d8b49beb046f21980efea5bcb409a4b"
+      "hash": "7875b7fcbca8f1a26b9366c252d1f39e5411185e17d3bb203b2693e273810cdb"
     },
     "models": {
       "battery": "lipo-2s-260",
@@ -146,15 +146,6 @@
         -40.0,
         20.0,
         26.0
-      ]
-    },
-    {
-      "id": "harness",
-      "part": "harness-allowance",
-      "pos_mm": [
-        -20.0,
-        0.0,
-        12.0
       ]
     }
   ],

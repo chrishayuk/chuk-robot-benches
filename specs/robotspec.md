@@ -124,8 +124,10 @@ as-designed spec:
   hashed RobotSpec cited by both the inspector and the first arena episodes.*
 - **M1:** derivation pipeline v1 (parametric → geometry/mass sections) extracted as the
   shared library (viewer M1 = this M1); body_hash/robot_hash nesting implemented.
-- **M2:** CAD mode (STEP/STL + density map → mesh-integrated mass properties); electrical
-  source ingested to power graph.
+- **M2:** CAD mode (STEP/STL + density map → mesh-integrated mass properties). Electrical
+  source ingested to power graph landed early, ahead of CAD mode, as robowire M1
+  (`robowire::power_graph`, `DerivedRecord.power`/`mass_wiring_g`) — see specs/robowire.md
+  §4/§6.
 - **M3:** as-built layer live — tilt-table and scale rituals producing unit records;
   divergence thresholds enforced in the claims registry.
 - **M4:** cluster schema exercised (even if only in sim) — N-part robot round-trips

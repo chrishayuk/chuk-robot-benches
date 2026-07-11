@@ -4,65 +4,103 @@
       "code": "E01",
       "description": "every motor terminal pair reaches exactly one driver channel",
       "detail": "all motors paired to single driver channels",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
     },
     {
       "code": "E02",
       "description": "power pins reach a rail of legal voltage",
       "detail": "all power pins within rated ranges",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
     },
     {
       "code": "E03",
       "description": "polarity continuity (no +/- swap reachable)",
       "detail": "no supply/ground mixing on any net",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
     },
     {
       "code": "E04",
       "description": "no floating required pins",
       "detail": "all required pins connected",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
     },
     {
       "code": "E10",
       "description": "MCU pins carry required capabilities",
       "detail": "all demanded capabilities present",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
     },
     {
       "code": "E11",
       "description": "no MCU pin double-booked",
       "detail": "all MCU pins single-purpose",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
     },
     {
       "code": "E20",
       "description": "I2C addresses unique after reassignment plan",
       "detail": "all bus addresses unique post-reassignment",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
     },
     {
       "code": "E21",
       "description": "bus voltage-domain consistency",
       "detail": "all bus devices in the master's voltage domain",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
+    },
+    {
+      "code": "E33",
+      "description": "LEDs have series current limiting",
+      "detail": "all wired LEDs are current-limited",
+      "pass": true,
+      "tier": "fail"
     },
     {
       "code": "E40",
       "description": "switch interrupts the main power path (tech-check)",
       "detail": "battery positive reaches loads only through a switch",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
     },
     {
       "code": "E41",
       "description": "failsafe stop chain declared and complete",
       "detail": "stop chain complete: CRSF failsafe frames -> kernel commands neutral -> ESC S1/S2 driven to neutral by MCU; ESC self-cuts on signal loss",
-      "pass": true
+      "pass": true,
+      "tier": "fail"
+    },
+    {
+      "code": "E30",
+      "description": "per-rail worst-case draw vs source capability (C-rating, regulator)",
+      "detail": "every rail's worst-case draw fits its source's rated capacity",
+      "pass": true,
+      "tier": "fail"
+    },
+    {
+      "code": "E31",
+      "description": "wire gauge vs worst-case current per segment (ampacity table); connector/fuse ratings",
+      "detail": "every gauge-declared net and every rated fuse/connector fits its worst-case current",
+      "pass": true,
+      "tier": "fail"
+    },
+    {
+      "code": "E32",
+      "description": "brownout topology: MCU rail exposure to motor-stall sag",
+      "detail": "no MCU shares an unbuffered rail with a motor-driving ESC",
+      "pass": true,
+      "tier": "fail"
     }
   ],
   "netlist": "mvp-wedge-harness",
-  "netlist_hash": "2b91fbc4114978a404f688d0664fa85e6d8b49beb046f21980efea5bcb409a4b",
+  "netlist_hash": "7875b7fcbca8f1a26b9366c252d1f39e5411185e17d3bb203b2693e273810cdb",
   "pass": true,
   "robowire_version": "0.1.0-m0"
 }

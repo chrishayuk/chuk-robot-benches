@@ -198,9 +198,26 @@ rather than a guess.
 ## 4. Derived outputs
 
 1. **Power graph** → RobotSpec `power:` section and arena-plant brownout model (rails,
-   chains, sense points, per-segment resistance from gauge+length).
+   chains, sense points, per-segment resistance from gauge+length). **Done** —
+   `robowire::power_graph::derive_power_graph` (one `PowerRail` per battery/regulator
+   `power_out` pin with a declared capacity, the same sources E30 checks; one
+   `WireSegment` per gauge-declared net, the same nets E31 checks; one `PowerChain` per
+   motor, source→ESC→motor). `sense_points` is honestly left empty — no current-sense
+   part exists in the catalogue yet, so nothing is fabricated there. `PowerGraph` is a
+   plain-data shape owned by `robotspec` (so it can live on `DerivedRecord`) that
+   `robowire` — which already depends on `robotspec` — constructs directly.
 2. **Wiring mass estimate** → RobotSpec mass roll-up (gauge × length × density + connector
-   masses) — wiring is 3–5g of a 150g budget; it should be derived, not guessed.
+   masses) — wiring is 3–5g of a 150g budget; it should be derived, not guessed. **Done**
+   — `robowire::power_graph::wiring_mass_g` sums bare-copper conductor mass (derived from
+   copper resistivity + density against the same resistance table E31's ampacity check
+   uses, not a second independent reference) over every gauge+length-declared net, plus
+   the catalogue `mass_g` of every connector/fuse/PTC instance in the netlist. This
+   retires the old flat `harness-allowance` placeholder part entirely (removed from the
+   catalogue and from `robots/mvp-wedge.json`'s `components[]`); `attach_power_graph`
+   folds the derived figure into `mass_total_g`/`budget_margin_g` and re-runs D02 against
+   the corrected total, via the new `robowire power <netlist> --robot <robot.json>` CLI
+   command (`robotspec::derive()` itself is untouched — `mass_wiring_g: 0.0`, `power:
+   None` for any bare, non-merged call).
 3. **Diagram render** — logical schematic view (rails left-to-right, buses grouped),
    generated from the netlist; SVG output suitable for the inspector and the build sheet.
 4. **Bench verification procedure (the physical test)** — a generated, ordered checklist
@@ -244,13 +261,14 @@ rather than a guess.
   the MVP wedge harness and dedicated demo harnesses exercising
   switch+LED+motor+sensor+button and a potentiometer dimmer,
   including tests proving current changes when voltage does.*
-- **M1:** power budget checks (E30–E32) — done: worst-case per-rail draw vs battery
+- **M1 — done:** power budget checks (E30–E32): worst-case per-rail draw vs battery
   C-rating/regulator `max_a`, wire gauge vs an AWG ampacity table (`Net.gauge_awg`/
   `length_mm`), MCU/motor-rail brownout topology warning — plus a live, one-shot wire
   IR-drop and battery terminal-voltage sag shown in run mode (§3a), single-sourced from
-  the same helpers. Still open: power graph derivation into RobotSpec's `power:` section
-  and wiring mass roll-up (§4 items 1–2) — `power.rs`'s internal per-rail/per-net
-  reachability is shaped to become that artifact, but the artifact itself isn't built.
+  the same helpers. Power graph derivation into RobotSpec's `power:` section and wiring
+  mass roll-up (§4 items 1–2): also done — `robowire power <netlist> --robot <robot>`
+  produces the merged, wiring-inclusive `DerivedRecord`; the old flat `harness-allowance`
+  mass placeholder is retired.
 - **M2:** diagram render (SVG) + generated bench verification procedure; first physical
   harness verified against its checklist (the electrical as-built ritual goes live).
 - **M3:** arena-plant consumes the power graph — first brownout scenario runs against a

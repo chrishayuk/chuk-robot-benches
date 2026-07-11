@@ -59,6 +59,70 @@ pub(crate) fn cmd_view(args: &[String]) {
     }
 }
 
+pub(crate) fn cmd_power(args: &[String]) {
+    let flag = |name: &str| {
+        args.iter()
+            .position(|a| a == name)
+            .and_then(|i| args.get(i + 1).cloned())
+    };
+    let path = PathBuf::from(&args[0]);
+    let netlist: Netlist = serde_json::from_slice(
+        &std::fs::read(&path).unwrap_or_else(|e| die(&format!("{path:?}: {e}"))),
+    )
+    .unwrap_or_else(|e| die(&format!("parse: {e}")));
+    let robot_path = flag("--robot").unwrap_or_else(|| die("--robot <robot.json> required"));
+    let robot: robotspec::RobotSpec = serde_json::from_slice(
+        &std::fs::read(&robot_path).unwrap_or_else(|e| die(&format!("{robot_path}: {e}"))),
+    )
+    .unwrap_or_else(|e| die(&format!("parse {robot_path}: {e}")));
+    let parts_dir = PathBuf::from(flag("--parts").unwrap_or_else(|| "parts".into()));
+    let cat = ElecCatalogue::load(&parts_dir).unwrap_or_else(|e| die(&e));
+
+    let derived = robotspec::derive(&robot, &cat).unwrap_or_else(|e| die(&e));
+    let derived =
+        robowire::power_graph::attach_power_graph(derived, &netlist, &cat).unwrap_or_else(|e| die(&e));
+
+    println!(
+        "mass_total_g  {:.2}  (chassis {:.2} + parts {:.2} + wiring {:.2})",
+        derived.mass_total_g, derived.mass_chassis_g, derived.mass_parts_g, derived.mass_wiring_g
+    );
+    println!("budget_margin {:.2}g", derived.budget_margin_g);
+    if let Some(pg) = &derived.power {
+        for rail in &pg.rails {
+            match rail.capacity_a {
+                Some(cap) => println!(
+                    "rail {}: {:.2}A worst-case vs {cap:.2}A capacity ({:+.2}A margin)",
+                    rail.source, rail.worst_case_a, rail.margin_a.unwrap_or(0.0)
+                ),
+                None => println!("rail {}: {:.2}A worst-case (no declared capacity)", rail.source, rail.worst_case_a),
+            }
+        }
+        for seg in &pg.segments {
+            println!(
+                "segment {} ({}AWG): {:.2}A worst-case vs {:.2}A ampacity",
+                seg.net,
+                seg.gauge_awg,
+                seg.worst_case_a,
+                seg.ampacity_a.unwrap_or(0.0)
+            );
+        }
+        for chain in &pg.chains {
+            println!("chain: {} -> {} -> {}", chain.source, chain.esc, chain.motor);
+        }
+    }
+    for c in &derived.checks {
+        if !c.pass {
+            println!("FAIL {} {}", c.code, c.detail);
+        }
+    }
+
+    if let Some(out) = flag("--out") {
+        std::fs::write(&out, serde_json::to_string_pretty(&derived).unwrap())
+            .unwrap_or_else(|e| die(&format!("writing {out}: {e}")));
+        println!("wrote {out}");
+    }
+}
+
 pub(crate) fn cmd_design(args: &[String]) {
     let flag = |name: &str| {
         args.iter()

@@ -2,27 +2,27 @@
   "pipeline_version": "derive-v0.1.0-parametric",
   "schema_version": "robotspec-v0.1",
   "resolved_parts": {
-    "bbb-dual-esc": "f15f51643ac411652040bff8eaa2f29740b889fcf567760a40b69530a34210b4",
-    "elrs-rx": "054222bafbef2531d6dfde0364d877110590cbcb84db2fb5c7030579990735f0",
-    "harness-allowance": "3b41ec86b661403cb143f332e01aad3e73aa53624091bd0d13cd69cae985c8e6",
-    "imu-icm42688": "88e576d5d10ac2e58ce2b1bffd5d7c400d98cf80e407235bcaf1eea4b68660da",
+    "bbb-dual-esc": "dde807abb89124830b4d8a58c01a3876df06c96dca1f361e5a1246a58767f28d",
+    "elrs-rx": "f66126927a2269256bf8fa2170f696f80ede74170936721f3c6beb56d0636aa7",
+    "imu-icm42688": "64a7ebd77f288d792de8472b5c7d7bf71df422fb048e423fe16738a51eccdb90",
     "lipo-2s-260": "40b6e2c6f9368ca873a100afc631f611a9c7855b7f28aa08b781b03a8efd5767",
-    "n20-motor-6v": "aa6ffdae1a9894282dcea92202ccb8610edfd187d0085102a9a0d204b62e14e6",
+    "n20-motor-6v": "6d21e96513bfaa3ff9594d05dfef46af6782e6a7154571eef0abc4e819d0a97d",
     "power-switch-slide": "5c95f31dae85c873e03020d2e682763b0ab3138f9d54b7ae22ec5f7bb990e298",
-    "rp2350-zero": "a5ad65c2af2bc94269e1086bc6b7f2b8e1a88a9832bdfea0a4ed36806725801f",
-    "vl53l0x-breakout": "aa3b62a38126fb9a2e7187583e376681ed87eaeb76f870b35c1d7e9b5810ac97",
+    "rp2350-zero": "19b534b5ef6eca1699526148252e041d0c46bb042322e9b27c56284248312c0e",
+    "vl53l0x-breakout": "d0691cdb7360d4328932addb43943fe5668ff46e42078b199ec74daead238e50",
     "wheel-32-foam": "f26c420eb5461e807c92d85f9c869330fd687371a8d4161324bc789e29b29e51"
   },
-  "mass_total_g": 100.93538198424494,
+  "mass_total_g": 100.76420922204736,
   "mass_chassis_g": 41.93538198424494,
-  "mass_parts_g": 59.0,
-  "budget_margin_g": 49.06461801575506,
+  "mass_parts_g": 55.0,
+  "mass_wiring_g": 3.8288272378024177,
+  "budget_margin_g": 49.235790777952644,
   "cog_mm": [
-    -12.330503425391491,
-    0.29721985898545156,
-    11.2478532419728
+    -12.014024698321327,
+    0.3094845183039142,
+    11.21681620502588
   ],
-  "yaw_inertia_gmm2": 91314.05178430925,
+  "yaw_inertia_gmm2": 91068.69020364515,
   "footprint_mm": [
     95.0,
     95.0
@@ -52,10 +52,10 @@
     ]
   ],
   "worst_tip_edge": "rear",
-  "worst_tip_distance_mm": 22.66949657460851,
-  "worst_tip_angle_deg": 63.61091564284754,
-  "static_tip_energy_mj": 13.915808393287811,
-  "brake_pitch_limit_ms2": 49.98466545763765,
+  "worst_tip_distance_mm": 22.98597530167867,
+  "worst_tip_angle_deg": 63.988308063385695,
+  "static_tip_energy_mj": 13.650751292452684,
+  "brake_pitch_limit_ms2": 49.84628214352583,
   "checks": [
     {
       "code": "D01",
@@ -67,7 +67,7 @@
       "code": "D02",
       "description": "mass within class limit",
       "pass": true,
-      "detail": "100.9 g of 150 g"
+      "detail": "100.8 g of 150 g"
     },
     {
       "code": "D05",
@@ -82,6 +82,91 @@
       "detail": "all mass/CoG/inertia/geometry quantities computed by this pipeline"
     }
   ],
-  "body_hash": "13d9db5bca2f483eda54470a18883363e415266fde8c96d3658928ad3fd81787",
-  "robot_hash": "e823a6e502da8bb3e1f7a4faff0409d8e144abd14b4688c3b85514641cf7a2e3"
+  "body_hash": "a47164ab60a9bf50bc7660db3bd17b8df967d858d90fd5eb0997806468724895",
+  "robot_hash": "c82a51db24bebe82e9627977a9f269bbc5bf897f724f431cef91c13ef70af917",
+  "power": {
+    "rails": [
+      {
+        "source": "batt",
+        "worst_case_a": 3.3440000000000003,
+        "capacity_a": 7.8,
+        "margin_a": 4.4559999999999995
+      },
+      {
+        "source": "esc.BEC5V",
+        "worst_case_a": 0.129,
+        "capacity_a": 1.0,
+        "margin_a": 0.871
+      },
+      {
+        "source": "mcu.3V3",
+        "worst_case_a": 0.039,
+        "capacity_a": 0.3,
+        "margin_a": 0.261
+      }
+    ],
+    "segments": [
+      {
+        "net": "vbat_sw",
+        "gauge_awg": 14,
+        "length_mm": 40.0,
+        "resistance_ohms": 0.00033136,
+        "worst_case_a": 3.3440000000000003,
+        "ampacity_a": 5.9
+      },
+      {
+        "net": "vbat",
+        "gauge_awg": 14,
+        "length_mm": 60.0,
+        "resistance_ohms": 0.0004970399999999999,
+        "worst_case_a": 3.3440000000000003,
+        "ampacity_a": 5.9
+      },
+      {
+        "net": "m_l_a",
+        "gauge_awg": 18,
+        "length_mm": 70.0,
+        "resistance_ohms": 0.0014665700000000002,
+        "worst_case_a": 1.6,
+        "ampacity_a": 2.3
+      },
+      {
+        "net": "m_l_b",
+        "gauge_awg": 18,
+        "length_mm": 70.0,
+        "resistance_ohms": 0.0014665700000000002,
+        "worst_case_a": 1.6,
+        "ampacity_a": 2.3
+      },
+      {
+        "net": "m_r_a",
+        "gauge_awg": 18,
+        "length_mm": 70.0,
+        "resistance_ohms": 0.0014665700000000002,
+        "worst_case_a": 1.6,
+        "ampacity_a": 2.3
+      },
+      {
+        "net": "m_r_b",
+        "gauge_awg": 18,
+        "length_mm": 70.0,
+        "resistance_ohms": 0.0014665700000000002,
+        "worst_case_a": 1.6,
+        "ampacity_a": 2.3
+      }
+    ],
+    "chains": [
+      {
+        "source": "batt",
+        "esc": "esc",
+        "motor": "m_l"
+      },
+      {
+        "source": "batt",
+        "esc": "esc",
+        "motor": "m_r"
+      }
+    ],
+    "sense_points": []
+  }
 }

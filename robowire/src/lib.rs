@@ -14,6 +14,7 @@ pub mod catalogue;
 pub mod checks;
 pub mod graph;
 pub mod power;
+pub mod power_graph;
 pub mod prose;
 pub mod render;
 pub mod schema;

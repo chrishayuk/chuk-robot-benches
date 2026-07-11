@@ -33,27 +33,36 @@ use std::collections::{BTreeMap, BTreeSet};
 /// passthrough gated on the passthrough instance's own `gnd` pin actually
 /// reaching the ground plane (an ungrounded regulator can't buffer anything,
 /// worst case or not — mirrors `robosim::simulate`'s live passthrough gate).
-struct WorstCaseGraph {
+pub(crate) struct WorstCaseGraph {
     /// All worst-case bridges (switch/button/resistor/potentiometer/wiring)
     /// — used for current reachability. Resistor/potentiometer bridge here
     /// (current still flows through a resistor) but not in `undirected_zero_r`
     /// (a resistor is a real voltage drop, not a lossless passthrough).
-    undirected: BTreeMap<String, BTreeSet<String>>,
+    pub(crate) undirected: BTreeMap<String, BTreeSet<String>>,
     /// Zero-resistance bridges only (switch/button/wiring) — used for
     /// declared-voltage propagation (`resolve_voltages`) and for E32's
     /// "same physical rail" test.
-    undirected_zero_r: BTreeMap<String, BTreeSet<String>>,
+    pub(crate) undirected_zero_r: BTreeMap<String, BTreeSet<String>>,
     /// Directed power_in -> power_out edges (regulator/BEC/MCU-3V3-out),
     /// gated on the instance's own ground actually being connected.
-    forward: BTreeMap<String, BTreeSet<String>>,
+    pub(crate) forward: BTreeMap<String, BTreeSet<String>>,
 }
 
 /// The net touching `inst`'s first pin declared with role `role`, if wired.
-fn pin_net_by_role(elec: &Elec, inst: &str, net_of: &BTreeMap<String, String>, role: &str) -> Option<String> {
+pub(crate) fn pin_net_by_role(
+    elec: &Elec,
+    inst: &str,
+    net_of: &BTreeMap<String, String>,
+    role: &str,
+) -> Option<String> {
     elec.pins.iter().find(|(_, d)| d.role == role).and_then(|(p, _)| net_of.get(&format!("{inst}.{p}")).cloned())
 }
 
-fn build(nl: &Netlist, cat: &ElecCatalogue, net_of: &BTreeMap<String, String>) -> Result<WorstCaseGraph, String> {
+pub(crate) fn build(
+    nl: &Netlist,
+    cat: &ElecCatalogue,
+    net_of: &BTreeMap<String, String>,
+) -> Result<WorstCaseGraph, String> {
     let mut undirected: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut undirected_zero_r: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut passthrough: Vec<(Vec<String>, Vec<String>, Option<String>)> = Vec::new();
@@ -130,7 +139,10 @@ fn build(nl: &Netlist, cat: &ElecCatalogue, net_of: &BTreeMap<String, String>) -
 /// `robosim::electrical::resolve_voltages`, standalone here since a
 /// resistor/potentiometer is a real drop and must not inherit a neighbor's
 /// voltage this way.
-fn resolve_voltages(nl: &Netlist, undirected_zero_r: &BTreeMap<String, BTreeSet<String>>) -> BTreeMap<String, f64> {
+pub(crate) fn resolve_voltages(
+    nl: &Netlist,
+    undirected_zero_r: &BTreeMap<String, BTreeSet<String>>,
+) -> BTreeMap<String, f64> {
     let mut resolved: BTreeMap<String, f64> = BTreeMap::new();
     for net in &nl.nets {
         let Some(v) = net.volts else { continue };
@@ -198,7 +210,7 @@ fn led_series_supply(
 /// ESC driving it, not its own terminal net, since that's the net a rail
 /// budget actually needs to see. An LED+resistor/potentiometer leg draws
 /// `(v_supply - forward_v) / ohms` at its own anode net.
-fn worst_case_sinks(
+pub(crate) fn worst_case_sinks(
     nl: &Netlist,
     cat: &ElecCatalogue,
     net_of: &BTreeMap<String, String>,

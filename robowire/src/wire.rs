@@ -39,3 +39,24 @@ pub fn net_resistance_ohms(net: &Net) -> Option<f64> {
     let len_m = net.length_mm? / 1000.0;
     awg_resistance_ohms_per_m(awg).map(|r| r * len_m)
 }
+
+/// Standard copper resistivity at 20°C (Ω·m) and density (kg/m³) — the two
+/// physical constants `copper_mass_g_per_m` derives conductor mass from,
+/// rather than a second independent (and independently error-prone) mass
+/// table alongside `AWG_TABLE`'s resistance column.
+const COPPER_RESISTIVITY_OHM_M: f64 = 1.68e-8;
+const COPPER_DENSITY_KG_PER_M3: f64 = 8960.0;
+
+/// Bare-copper-conductor mass per metre for a gauge already in `AWG_TABLE`,
+/// derived from its resistance (`R = ρL/A` ⇒ `A = ρ/R` for a 1m length) and
+/// copper's density — self-consistent with the resistance table rather than
+/// a second, independently-sourced reference. Excludes insulation jacket
+/// mass (a real wire weighs somewhat more than this) — a documented
+/// simplification, consistent with the "provisional/datasheet-approximate"
+/// convention used throughout the catalogue.
+pub fn copper_mass_g_per_m(awg: u32) -> Option<f64> {
+    let r_per_m = awg_resistance_ohms_per_m(awg)?;
+    let area_m2 = COPPER_RESISTIVITY_OHM_M / r_per_m;
+    let mass_per_m_kg = area_m2 * COPPER_DENSITY_KG_PER_M3;
+    Some(mass_per_m_kg * 1000.0)
+}
