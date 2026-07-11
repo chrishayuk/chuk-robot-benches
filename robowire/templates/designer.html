@@ -68,6 +68,14 @@
   .check { display: flex; gap: 7px; align-items: baseline; padding: 3px 0; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
   .check .pill { font-weight: 700; padding: 0 6px; border-radius: 3px; font-size: 10px; color: #0d1114; flex-shrink: 0; }
   .check .d { color: var(--dim); }
+  #selinfo {
+    border: 1px solid var(--accent); border-radius: 6px; padding: 8px 10px; margin: 10px 0 4px;
+  }
+  #selinfo .about { font-size: 12.5px; line-height: 1.5; text-wrap: pretty; margin: 4px 0; }
+  #selinfo .meta { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; color: var(--dim); overflow-wrap: anywhere; }
+  #selinfo .chip { display: inline-block; font-size: 10px; letter-spacing: 0.1em; padding: 0 7px; border-radius: 3px; font-weight: 700; color: #0d1114; }
+  #selinfo ul { margin: 5px 0 0; padding-left: 0; list-style: none; font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; }
+  #selinfo li { margin-top: 3px; overflow-wrap: anywhere; }
   #verdict { font-family: ui-monospace, Menlo, monospace; font-weight: 700; padding: 6px 8px; border-radius: 4px; margin-bottom: 6px; }
   #verdict.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
   #verdict.bad { background: color-mix(in srgb, var(--bad) 22%, transparent); color: var(--bad); }
@@ -103,6 +111,7 @@
 <div id="right">
   <div id="verdict"></div>
   <div id="checks"></div>
+  <div id="selinfo" style="display:none"></div>
   <h2>nets — click a pin, then another, to wire</h2>
   <div id="nets"></div>
   <h2>i2c buses</h2>
@@ -367,6 +376,102 @@ const WASM_B64 =
     const t = len2 ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2)) : 0;
     return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
   }
+  // Human-language mirrors of robowire's Rust prose (the canonical
+  // generator lives in view.rs; the editor mirrors it because it edits live).
+  const KIND_NOUN = {
+    battery: "the battery pack", switch: "the power switch", esc: "the motor controller",
+    mcu: "the brain", radio: "the radio receiver", tof: "a floor sensor",
+    imu: "the motion sensor", motor: "a drive motor", wiring: "the loom allowance",
+  };
+  function who(inst) {
+    return (KIND_NOUN[kindOf(inst)] || "'" + inst + "'") + " (" + inst + ")";
+  }
+  function roleText(d) {
+    if (!d) return "";
+    switch (d.role) {
+      case "pos": return "battery positive terminal";
+      case "gnd": return "ground";
+      case "power_in": return d.v_range ? `power input (rated ${d.v_range[0]}–${d.v_range[1]} V)` : "power input";
+      case "power_out": return `regulator output (${d.volts} V)`;
+      case "switch_in": return "master switch input";
+      case "switch_out": return "master switch output";
+      case "motor_in": return "motor terminal";
+      case "motor_out": return "driver output" + (d.channel ? ` (channel ${d.channel})` : "");
+      case "signal_in": return "signal input" + (d.signal ? ` (${d.signal})` : "");
+      case "signal_out": return "signal output" + (d.signal ? ` (${d.signal})` : "");
+      case "mcu_io": return `MCU pin [${(d.caps || []).join(", ")}]`;
+      case "bus_sda": return "I2C data (SDA)";
+      case "bus_scl": return "I2C clock (SCL)";
+      case "gpio_in": return "control input";
+      default: return d.role;
+    }
+  }
+  function wireAbout(net) {
+    const cls = netClass(net);
+    const insts = [...new Set(net.pins.map(p => splitPin(p)[0]))];
+    const listWho = skipKind => insts
+      .filter(i => kindOf(i) !== skipKind)
+      .map(who)
+      .join(" and ");
+    switch (cls) {
+      case "vbat":
+        return `The robot's main power line: raw ${net.volts ?? 7.4} V battery power flowing between ` +
+          insts.map(who).join(" and ") + ". Nothing downstream runs without it — and E40 demands the master switch sits in this path.";
+      case "v5":
+        return "The 5-volt supply: the motor controller's built-in regulator (BEC) makes clean 5 V and feeds " +
+          (listWho("esc") || "its loads") + " — this is what keeps them alive.";
+      case "v33":
+        return "The 3.3-volt sensor supply: the brain's onboard regulator powers " +
+          (listWho("mcu") || "the sensors") + " through this line.";
+      case "gnd":
+        return "The shared ground return. Every component's current flows back to the battery through this — it is the other half of every circuit on the robot.";
+      case "motor": {
+        const m = insts.find(i => kindOf(i) === "motor");
+        return "Motor power: the controller pushes current down this wire to spin " +
+          (m ? who(m) : "the motor") + ". Reverse the current and the wheel reverses.";
+      }
+      case "pwm":
+        return "A drive command line: the brain sets one motor channel's speed by sending timed pulses (PWM) down this wire. On radio loss the failsafe holds it at neutral — that is what stops the robot (E41).";
+      case "uart":
+        return "The control link: the radio receiver streams the driver's stick positions to the brain over this wire. If those frames stop arriving, the brain knows the radio is gone and triggers the failsafe.";
+      default:
+        return "A signal line.";
+    }
+  }
+  function renderSelInfo() {
+    const el = document.getElementById("selinfo");
+    if (selInst && nl.instances[selInst]) {
+      const part = partById[nl.instances[selInst]];
+      const prefix = selInst + ".";
+      const nets = nl.nets.filter(n => n.pins.some(pn => pn.startsWith(prefix)));
+      const busRefs = nl.buses.filter(b =>
+        b.devices.some(d => d.inst === selInst) || b.sda.startsWith(prefix) || b.scl.startsWith(prefix));
+      el.style.display = "block";
+      el.innerHTML =
+        `<b>${selInst}</b> <span class="chip" style="background:#8b969b">${part.kind}</span>` +
+        `<div class="about">${part.description || "(no catalogue description)"}</div>` +
+        `<div class="meta">${part.id} · ${part.mass_g ?? "?"} g${part.provisional ? " · datasheet-provisional" : ""}</div>` +
+        (nets.length || busRefs.length
+          ? `<ul>` + nets.map(n =>
+              `<li><span style="color:${COLORS[netClass(n)] || "#999"}">●</span> ${n.id} → ` +
+              n.pins.filter(pn => !pn.startsWith(prefix)).join(" · ") + `</li>`).join("") +
+            busRefs.map(b => `<li><span style="color:${COLORS.i2c}">●</span> ${b.id} (sensor bus)</li>`).join("") +
+            `</ul>`
+          : `<div class="meta">not wired yet</div>`);
+    } else if (selNet >= 0 && nl.nets[selNet]) {
+      const net = nl.nets[selNet];
+      const cls = netClass(net);
+      el.style.display = "block";
+      el.innerHTML =
+        `<b>${net.id}</b> <span class="chip" style="background:${COLORS[cls] || "#999"}">${LAYER_LABELS[cls] || cls}</span>` +
+        `<div class="about">${wireAbout(net)}</div>` +
+        `<ul>` + net.pins.map(pn => `<li>· ${pn} — ${roleText(decl(pn)) || "?"}</li>`).join("") + `</ul>`;
+    } else {
+      el.style.display = "none";
+      el.innerHTML = "";
+    }
+  }
+
   function removeInstance(inst) {
     delete nl.instances[inst];
     delete layout[inst];
@@ -531,7 +636,7 @@ const WASM_B64 =
     const wi = wireAt(mx, my);
     if (wi >= 0) {
       selNet = wi; selInst = null;
-      renderNets(); draw();
+      renderNets(); renderSelInfo(); draw();
       const row = document.querySelectorAll("#nets .row")[wi];
       if (row) row.scrollIntoView({ block: "nearest" });
       return;
@@ -542,11 +647,11 @@ const WASM_B64 =
       dragInst = inst; dragMoved = false;
       dragOff = [mx - layout[inst][0], my - layout[inst][1]];
       cv.setPointerCapture(e.pointerId);
-      renderNets(); draw();
+      renderNets(); renderSelInfo(); draw();
       return;
     }
     pending = null; selInst = null; selNet = -1;
-    renderNets(); draw();
+    renderNets(); renderSelInfo(); draw();
   });
   cv.addEventListener("pointermove", e => {
     if (dragInst) {
@@ -562,10 +667,23 @@ const WASM_B64 =
       : instAt(mx, my) ? "move" : "default";
   });
   cv.addEventListener("pointerup", () => { if (dragInst) { dragInst = null; saveLayout(); } });
+  cv.addEventListener("dragover", e => {
+    if (e.dataTransfer.types.includes("text/robowire-part")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  });
+  cv.addEventListener("drop", e => {
+    const partId = e.dataTransfer.getData("text/robowire-part");
+    if (!partId) return;
+    e.preventDefault();
+    placeInstance(partId, e.offsetX, e.offsetY);
+    refresh();
+  });
   window.addEventListener("keydown", e => {
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-    if (e.key === "Escape") { pending = null; pickHandler = null; selInst = null; selNet = -1; renderNets(); draw(); hint(""); }
+    if (e.key === "Escape") { pending = null; pickHandler = null; selInst = null; selNet = -1; renderNets(); renderSelInfo(); draw(); hint(""); }
     if ((e.key === "Delete" || e.key === "Backspace")) {
       if (selNet >= 0) { nl.nets.splice(selNet, 1); selNet = -1; refresh(); }
       else if (selInst) { removeInstance(selInst); refresh(); }
@@ -580,6 +698,19 @@ const WASM_B64 =
   }
 
   // ---- panels -----------------------------------------------------------------
+  function placeInstance(partId, x, y) {
+    const p = partById[partId];
+    const short = { battery: "batt", switch: "sw", radio: "rx", mcu: "mcu", esc: "esc", imu: "imu", motor: "m", tof: "tof" };
+    const base = short[p.kind] || p.kind;
+    let cand = base, k = 2;
+    while (cand in nl.instances) cand = base + "_" + k++;
+    nl.instances[cand] = partId;
+    if (x != null) layout[cand] = [x, y];
+    saveLayout();
+    selInst = cand; selNet = -1;
+    return cand;
+  }
+
   function renderPalette() {
     const el = document.getElementById("palette");
     el.innerHTML = "";
@@ -587,19 +718,15 @@ const WASM_B64 =
       const div = document.createElement("div");
       div.className = "part";
       div.innerHTML = `<span>${p.id}<br><span class="k">${p.kind}</span></span>`;
+      div.draggable = true;
+      div.title = (p.description || "") + " — drag onto the board, or click + place";
+      div.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/robowire-part", p.id);
+        e.dataTransfer.effectAllowed = "copy";
+      });
       const btn = document.createElement("button");
       btn.className = "mini"; btn.textContent = "+ place";
-      btn.title = p.description || "";
-      btn.addEventListener("click", () => {
-        let base = p.kind === "motor" ? "m" : p.kind === "tof" ? "tof" : p.kind;
-        let name = base, k = 2;
-        const short = { battery: "batt", switch: "sw", radio: "rx", mcu: "mcu", esc: "esc", imu: "imu" };
-        name = short[p.kind] || base;
-        let cand = name;
-        while (cand in nl.instances) cand = name + "_" + k++;
-        nl.instances[cand] = p.id;
-        refresh();
-      });
+      btn.addEventListener("click", () => { placeInstance(p.id); refresh(); });
       div.appendChild(btn);
       el.appendChild(div);
     }
@@ -618,7 +745,7 @@ const WASM_B64 =
         ` sig:<select><option value="">—</option><option${net.signal === "pwm" ? " selected" : ""}>pwm</option><option${net.signal === "uart" ? " selected" : ""}>uart</option></select>` +
         ` <button class="mini del">✕</button></div>` +
         `<div class="pins">${net.pins.join(" · ")} <button class="mini addpin">+pin</button></div>`;
-      div.addEventListener("click", () => { if (selNet !== i) { selNet = i; renderNets(); draw(); } });
+      div.addEventListener("click", () => { if (selNet !== i) { selNet = i; selInst = null; renderNets(); renderSelInfo(); draw(); } });
       div.querySelector(".id").addEventListener("change", e => { net.id = e.target.value; refresh(); });
       div.querySelector(".volts").addEventListener("change", e => {
         const v = parseFloat(e.target.value);
@@ -800,6 +927,7 @@ const WASM_B64 =
     renderNets();
     renderBuses();
     renderFailsafe();
+    renderSelInfo();
     draw();
     runChecksSoon();
   }
