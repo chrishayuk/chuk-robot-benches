@@ -22,6 +22,30 @@
     const f = 900 / depth;
     return [cv.clientWidth / 2 + x1 * f, cv.clientHeight / 2 - z2 * f + 80];
   }
+  // Inverse of project3, constrained to a known world-space height `z` (you
+  // can't recover a full 3D point from one 2D screen point without fixing
+  // one degree of freedom — dragging a wire bend fixes it at the bend's
+  // current height, so it slides across a horizontal plane, not through it).
+  // Solved by substitution: z2 is linear in `depth` (from the screenY
+  // equation), and `depth` is linear in z2 (from the yaw/pitch algebra), so
+  // one substitution collapses to a single linear equation in `depth`.
+  function unproject3(screenX, screenY, z) {
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    if (Math.abs(sp) < 1e-6) return null; // pitch is kept away from 0/π by the wheel-zoom clamp
+    const K = (cv.clientHeight / 2 + 80 - screenY) / 900; // z2 = K * depth
+    const denom = 1 - (cp * K) / sp;
+    if (Math.abs(denom) < 1e-6) return null;
+    const depth = (dist - z / sp) / denom;
+    if (depth < 40) return null;
+    const f = 900 / depth;
+    const x1 = (screenX - cv.clientWidth / 2) / f;
+    const z2 = K * depth;
+    const y1 = (z2 - z * cp) / sp;
+    const dx = x1 * cy + y1 * sy;   // inverse yaw rotation (transpose, since it's orthonormal)
+    const dy = -x1 * sy + y1 * cy;
+    return [pc[0] + dx, pc[1] + dy, z];
+  }
   function geo3(inst) {
     const g = boxGeo(inst);
     const kind = kindOf(inst);
@@ -57,10 +81,24 @@
     return pts;
   }
   const CLASS_LIFT = { gnd: 12, vbat: 24, v5: 36, v33: 48, motor: 30, pwm: 62, uart: 72, sig: 66, i2c: 84 };
+  // Default altitude for a 2-pin net's arc midpoint, absent any user bend —
+  // shared between the render path and the "what height should a fresh drag
+  // start at" logic in 11-boot.js.
+  function defaultWireLift3(net, i, ends) {
+    return (CLASS_LIFT[netClass(net)] || 40) + (i % 3) * 4 + Math.max(ends[0][2], ends[1][2]);
+  }
   function netArcs3(net, i) {
     const ends = net.pins.map(pin3).filter(Boolean);
     const lift = (CLASS_LIFT[netClass(net)] || 40) + (i % 3) * 4;
-    if (ends.length === 2) return [arc3(ends[0], ends[1], lift)];
+    if (ends.length === 2) {
+      const bend = wireBendOf(net.id);
+      if (bend) {
+        const z = bend[2] != null ? bend[2] : defaultWireLift3(net, i, ends);
+        const hub = [bend[0], bend[1], z];
+        return [arc3(ends[0], hub, 8), arc3(hub, ends[1], 8)];
+      }
+      return [arc3(ends[0], ends[1], lift)];
+    }
     if (ends.length > 2) {
       const n = ends.length;
       const hub = [

@@ -35,6 +35,9 @@
   let dpr = 1;
   let mode = "2d";
   let wireDrag = null;      // {from, cur:[x,y], moved} while dragging a wire
+  let dragWireNet = null;   // net index while dragging an EXISTING wire's bend point
+  let dragWireMoved = false;
+  let dragWireZ = 0;        // 3D only: the fixed world-space height the drag slides across
   let orbiting = false;
   // Run mode (12-run.js) — declared here, not there: draw()/draw3() (07/08)
   // read runMode/runState unconditionally, and 11-boot.js's startup tail

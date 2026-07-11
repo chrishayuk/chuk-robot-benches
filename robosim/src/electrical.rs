@@ -11,6 +11,7 @@
 //! catalogue fields a calculation needs (e.g. no `ohms`, no `nominal_v`)
 //! simply contributes 0A rather than guessing.
 
+use crate::types::RunInputs;
 use robowire::catalogue::{Elec, ElecCatalogue, ElecPart};
 use robowire::schema::{split_pin, Netlist};
 use std::collections::{BTreeMap, BTreeSet};
@@ -116,16 +117,36 @@ pub fn motor_winding_ohms(motor: &robowire::catalogue::ElecPart) -> Option<f64> 
     }
 }
 
-/// Find the resistor in series with a lit LED and the net feeding that
-/// resistor — enough to solve I = (V_supply − forward_v) / ohms, the
+/// A `resistor`'s fixed ohms, or a `potentiometer`'s LIVE ohms — its declared
+/// range scaled by the current dial position (`RunInputs.dial_positions`,
+/// default 0.5 if the user hasn't touched it) — so turning the dial changes
+/// the resistance, and therefore the current, exactly like swapping in a
+/// different fixed resistor would. `None` for any other kind, or a
+/// potentiometer missing its declared range.
+fn series_limiter_ohms(part: &ElecPart, inst: &str, inputs: &RunInputs) -> Option<f64> {
+    match part.kind.as_str() {
+        "resistor" => part.ohms,
+        "potentiometer" => {
+            let lo = part.ohms_min.unwrap_or(0.0);
+            let hi = part.ohms_max?;
+            let pos = inputs.dial_positions.get(inst).copied().unwrap_or(0.5).clamp(0.0, 1.0);
+            Some(lo + (hi - lo) * pos)
+        }
+        _ => None,
+    }
+}
+
+/// Find the resistor-or-potentiometer in series with a lit LED and the net
+/// feeding it — enough to solve I = (V_supply − forward_v) / ohms, the
 /// standard hand-calculation for an LED+resistor circuit (a fixed-Vf diode
 /// approximation, not an iterative nonlinear SPICE solve). `None` if no such
-/// resistor is structurally identifiable (E33 would already be failing) or
-/// it declares no `ohms`.
+/// limiter is structurally identifiable (E33 would already be failing) or it
+/// declares no usable resistance.
 pub fn led_series_supply(
     nl: &Netlist,
     cat: &ElecCatalogue,
     net_of: &BTreeMap<String, String>,
+    inputs: &RunInputs,
     led_inst: &str,
 ) -> Result<Option<(String, f64)>, String> {
     let prefix = format!("{led_inst}.");
@@ -140,10 +161,7 @@ pub fn led_series_supply(
             }
             let Some(other_part_id) = nl.instances.get(other_inst) else { continue };
             let (other_part, _) = cat.get(other_part_id)?;
-            if other_part.kind != "resistor" {
-                continue;
-            }
-            let Some(ohms) = other_part.ohms else { continue };
+            let Some(ohms) = series_limiter_ohms(other_part, other_inst, inputs) else { continue };
             let Some(other_elec) = &other_part.elec else { continue };
             for pin in other_elec.pins.keys() {
                 let ep = format!("{other_inst}.{pin}");

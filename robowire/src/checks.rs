@@ -355,9 +355,10 @@ fn led_is_wired(nl: &Netlist, inst: &str) -> bool {
     nl.nets.iter().any(|net| net.pins.iter().any(|p| p.starts_with(&prefix)))
 }
 
-/// Whether `inst` (an LED) has a resistor-kind neighbor on any net it's wired
-/// to — the E33 series-current-limiter rule, shared with
-/// `runtime::run_state`'s `lit` projection.
+/// Whether `inst` (an LED) has a resistor-or-potentiometer-kind neighbor on
+/// any net it's wired to — the E33 series-current-limiter rule, shared with
+/// `robosim`'s `lit` projection. A potentiometer wired as a rheostat limits
+/// current exactly like a fixed resistor (its value just moves).
 pub fn led_current_limited(nl: &Netlist, cat: &ElecCatalogue, inst: &str) -> Result<bool, String> {
     let prefix = format!("{inst}.");
     let mut limited = false;
@@ -371,7 +372,7 @@ pub fn led_current_limited(nl: &Netlist, cat: &ElecCatalogue, inst: &str) -> Res
                 continue;
             }
             let other_part = nl.instances.get(other_inst).and_then(|pid| cat.get(pid).ok());
-            if other_part.map_or(false, |(op, _)| op.kind == "resistor") {
+            if other_part.map_or(false, |(op, _)| matches!(op.kind.as_str(), "resistor" | "potentiometer")) {
                 limited = true;
             }
         }

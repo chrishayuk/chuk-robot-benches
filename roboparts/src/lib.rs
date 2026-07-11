@@ -140,6 +140,17 @@ pub struct Part {
     /// Resistance in ohms — `resistor`-kind parts only.
     #[serde(default)]
     pub ohms: Option<f64>,
+    /// End-to-end resistance range for a `potentiometer`-kind part (a
+    /// 2-terminal variable resistor / rheostat): its live resistance is
+    /// `ohms_min + (ohms_max - ohms_min) * dial_position` (run mode's
+    /// `RunInputs.dial_positions`, 0.0-1.0) — so turning the dial changes the
+    /// resistance, which changes the current, live, exactly like a fixed
+    /// resistor except the value moves. Accepted anywhere a `resistor` is
+    /// (E33's current-limiter check, run mode's series-supply resolution).
+    #[serde(default)]
+    pub ohms_min: Option<f64>,
+    #[serde(default)]
+    pub ohms_max: Option<f64>,
     /// Diode forward-voltage drop — `led`-kind parts only. Combined with a
     /// series resistor's `ohms` and the ACTUAL supply voltage, run mode
     /// solves I = (V − forward_v) / ohms: the standard hand-calculation for

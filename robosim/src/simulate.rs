@@ -51,20 +51,24 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
         let (part, _) = cat.get(part_id)?;
         let Some(elec) = &part.elec else { continue };
 
-        if matches!(part.kind.as_str(), "switch" | "button" | "resistor" | "wiring") {
+        if matches!(part.kind.as_str(), "switch" | "button" | "resistor" | "potentiometer" | "wiring") {
             let pin_names: Vec<&String> = elec.pins.keys().collect();
             if pin_names.len() == 2 {
                 let closed = match part.kind.as_str() {
                     "switch" => inputs.switches.get(inst).copied().unwrap_or(false),
                     "button" => inputs.buttons.get(inst).copied().unwrap_or(false),
-                    _ => true, // resistor / wiring: always conducts
+                    _ => true, // resistor / potentiometer / wiring: always conducts
                 };
+                // Zero-resistance (ideal) kinds carry a net's voltage across
+                // unchanged (resolve_voltages); resistor/potentiometer are a
+                // real drop and must not.
+                let zero_resistance = matches!(part.kind.as_str(), "switch" | "button" | "wiring");
                 if closed {
                     let e0 = format!("{inst}.{}", pin_names[0]);
                     let e1 = format!("{inst}.{}", pin_names[1]);
                     if let (Some(n0), Some(n1)) = (net_of.get(&e0), net_of.get(&e1)) {
                         link(&mut undirected, n0, n1);
-                        if part.kind.as_str() != "resistor" {
+                        if zero_resistance {
                             link(&mut undirected_zero_r, n0, n1);
                         }
                     }
@@ -222,7 +226,7 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
 
                 let mut amps = 0.0;
                 if lit && limited {
-                    if let Some((supply_net, ohms)) = led_series_supply(nl, cat, &net_of, inst)? {
+                    if let Some((supply_net, ohms)) = led_series_supply(nl, cat, &net_of, inputs, inst)? {
                         if ohms > 0.0 {
                             let v_supply = net_volts_live(&resolved_volts, &hot, &supply_net);
                             let vf = part.forward_v.unwrap_or(0.0);

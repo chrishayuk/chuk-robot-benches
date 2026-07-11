@@ -17,6 +17,7 @@
     delete layout[inst];
     const prefix = inst + ".";
     for (const net of nl.nets) net.pins = net.pins.filter(p => !p.startsWith(prefix));
+    for (const net of nl.nets) if (net.pins.length < 2) clearWireBend(net.id);
     nl.nets = nl.nets.filter(n => n.pins.length >= 2);
     for (const bus of nl.buses) {
       bus.devices = bus.devices.filter(d => d.inst !== inst);

@@ -33,6 +33,10 @@ fn demo() -> (Netlist, ElecCatalogue) {
     load("harness/examples/example-run-mode-demo.json")
 }
 
+fn dimmer() -> (Netlist, ElecCatalogue) {
+    load("harness/examples/example-dial-dimmer.json")
+}
+
 fn wedge() -> (Netlist, ElecCatalogue) {
     load("harness/mvp-wedge-harness.json")
 }
@@ -269,4 +273,57 @@ fn mvp_wedge_planted_dual_0x29_yields_bus_conflict() {
     let st = run_state(&nl, &cat, &RunInputs::default()).unwrap();
     assert_eq!(st.instances["tof_l"].bus_conflict, Some(true));
     assert_eq!(st.instances["tof_r"].bus_conflict, Some(true));
+}
+
+#[test]
+fn dial_alone_satisfies_e33_current_limiting() {
+    let (nl, cat) = dimmer();
+    let mut inputs = RunInputs::default();
+    inputs.switches.insert("sw".to_string(), true);
+    let st = run_state(&nl, &cat, &inputs).unwrap();
+    // No fixed resistor anywhere in this harness — only the potentiometer.
+    assert_eq!(st.instances["led1"].lit, Some(true));
+    assert_eq!(st.instances["led1"].current_limited, Some(true));
+}
+
+#[test]
+fn twisting_the_dial_changes_led_current_live() {
+    let (nl, cat) = dimmer();
+    let mut inputs = RunInputs::default();
+    inputs.switches.insert("sw".to_string(), true);
+
+    // potentiometer-1k: ohms_min=100, ohms_max=1000. led-red-5mm forward_v=2.0.
+    // Fed from "feed" (7.4V, declared). I = (V - Vf) / R.
+    let expected = |dial: f64| -> f64 {
+        let ohms = 100.0 + (1000.0 - 100.0) * dial;
+        (7.4 - 2.0) / ohms
+    };
+
+    for dial in [0.0, 0.25, 0.5, 0.75, 1.0] {
+        inputs.dial_positions.insert("pot".to_string(), dial);
+        let st = run_state(&nl, &cat, &inputs).unwrap();
+        let actual = st.instances["led1"].current_a.unwrap();
+        let want = expected(dial);
+        assert!(close(actual, want), "dial={dial}: current_a = {actual}, expected {want}");
+    }
+
+    // Turning the dial toward max resistance must strictly DIM the LED
+    // (lower current) — the whole point of a dimmer.
+    inputs.dial_positions.insert("pot".to_string(), 0.1);
+    let bright = run_state(&nl, &cat, &inputs).unwrap().instances["led1"].current_a.unwrap();
+    inputs.dial_positions.insert("pot".to_string(), 0.9);
+    let dim = run_state(&nl, &cat, &inputs).unwrap().instances["led1"].current_a.unwrap();
+    assert!(dim < bright, "higher dial position should draw less current (dimmer): dim={dim} bright={bright}");
+}
+
+#[test]
+fn dial_default_position_is_midway_when_untouched() {
+    let (nl, cat) = dimmer();
+    let mut inputs = RunInputs::default();
+    inputs.switches.insert("sw".to_string(), true);
+    // No dial_positions entry at all — should default to 0.5, not 0.
+    let st = run_state(&nl, &cat, &inputs).unwrap();
+    let expected = (7.4 - 2.0) / (100.0 + (1000.0 - 100.0) * 0.5);
+    let actual = st.instances["led1"].current_a.unwrap();
+    assert!(close(actual, expected), "default dial current_a = {actual}, expected {expected}");
 }

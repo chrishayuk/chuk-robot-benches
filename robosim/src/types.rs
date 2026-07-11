@@ -14,6 +14,10 @@ pub struct RunInputs {
     /// motor instance -> throttle in [-1.0, 1.0]
     #[serde(default)]
     pub throttles: BTreeMap<String, f64>,
+    /// potentiometer instance -> dial position in [0.0, 1.0], scaling its
+    /// live resistance between the part's declared ohms_min and ohms_max.
+    #[serde(default)]
+    pub dial_positions: BTreeMap<String, f64>,
     /// tof/imu instance -> user-set fake reading
     #[serde(default)]
     pub sensor_values: BTreeMap<String, f64>,

@@ -38,6 +38,24 @@
   }
 
   const STUB = 13;
+  // A user-dragged bend point for a 2-pin net, stored alongside component
+  // positions (same `layout` object, same localStorage persistence) under a
+  // "wire:" key so it can never collide with an instance name.
+  function wireBendOf(netId) {
+    const v = layout["wire:" + netId];
+    return Array.isArray(v) ? v : null;
+  }
+  // 2D drag: x/y only, preserving any 3D height already set (so tweaking a
+  // wire's schematic position doesn't reset how it was routed in 3D).
+  function setWireBend2D(netId, x, y) {
+    const prev = wireBendOf(netId);
+    layout["wire:" + netId] = [x, y, prev ? prev[2] : undefined];
+  }
+  // 3D drag: a full world-space point (dragging happens on a fixed-height
+  // plane — see unproject3 in 04-geom3d.js).
+  function setWireBend3D(netId, x, y, z) { layout["wire:" + netId] = [x, y, z]; }
+  function clearWireBend(netId) { delete layout["wire:" + netId]; }
+
   function netSegments(net) {
     const ends = [];
     for (const ep of net.pins) {
@@ -48,12 +66,13 @@
         stub: [q[0] + (q[2] || 0) * STUB, q[1] + (q[3] || 0) * STUB],
       });
     }
-    if (ends.length < 2) return { legs: [], segs: [], hub: null };
+    if (ends.length < 2) return { legs: [], segs: [], hub: null, bendHandle: null };
     const legs = ends.map(e => [e.pin, e.stub]);
+    const bend = ends.length === 2 ? wireBendOf(net.id) : null;
     // Control points extend along each pin's exit direction, so the wire
     // keeps leaving the pin before it sweeps toward the target — instead of
     // cutting straight back across its own component's body.
-    if (ends.length === 2) {
+    if (ends.length === 2 && !bend) {
       const [A, B] = ends;
       const d = Math.hypot(A.stub[0] - B.stub[0], A.stub[1] - B.stub[1]);
       const kFor = (from, to) => {
@@ -71,9 +90,14 @@
         segs: [[A.stub, [A.stub[0] + A.out[0] * ka, A.stub[1] + A.out[1] * ka],
                 [B.stub[0] + B.out[0] * kb, B.stub[1] + B.out[1] * kb], B.stub]],
         hub: null,
+        bendHandle: null,
       };
     }
-    const hub = [
+    // A user bend point routes the wire through it exactly like a genuine
+    // multi-pin junction — each end draws its own cubic into the shared
+    // point — but it's not a real junction, so no hub dot is drawn for it
+    // (that would misleadingly read as "3+ wires meet here").
+    const hub = bend || [
       ends.reduce((s, e) => s + e.stub[0], 0) / ends.length,
       ends.reduce((s, e) => s + e.stub[1], 0) / ends.length,
     ];
@@ -86,7 +110,8 @@
         if (dot < 0) k *= 0.45;
         return [e.stub, [e.stub[0] + e.out[0] * k, e.stub[1] + e.out[1] * k], hub, hub];
       }),
-      hub,
+      hub: bend ? null : hub,
+      bendHandle: bend ? hub : null,
     };
   }
   function cubicAt(seg, t) {

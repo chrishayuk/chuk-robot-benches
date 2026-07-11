@@ -64,7 +64,7 @@
         flowing = !!(ns && ns.amps > 0.001);
         if (flowing) col = "#57b48f"; // green — current is actually flowing here
       }
-      const { legs, segs, hub } = netSegments(net);
+      const { legs, segs, hub, bendHandle } = netSegments(net);
       cx.strokeStyle = col;
       cx.lineWidth = i === selNet ? 3 : 1.8;
       cx.shadowColor = col; cx.shadowBlur = i === selNet ? 12 : 5;
@@ -81,10 +81,20 @@
       if (flowing) { cx.setLineDash([]); cx.lineDashOffset = 0; }
       cx.shadowBlur = 0;
       if (hub) { cx.fillStyle = col; cx.beginPath(); cx.arc(hub[0], hub[1], 3.4, 0, Math.PI * 2); cx.fill(); }
+      if (bendHandle && !runMode) {
+        // A user-placed bend point, draggable — a small diamond (distinct
+        // from the round hub dot, which means "genuine multi-pin junction").
+        const s = i === selNet || dragWireNet === i ? 5 : 3.6;
+        cx.fillStyle = i === selNet || dragWireNet === i ? "#e8a33d" : col;
+        cx.beginPath();
+        cx.moveTo(bendHandle[0], bendHandle[1] - s); cx.lineTo(bendHandle[0] + s, bendHandle[1]);
+        cx.lineTo(bendHandle[0], bendHandle[1] + s); cx.lineTo(bendHandle[0] - s, bendHandle[1]);
+        cx.closePath(); cx.fill();
+      }
       if (runMode) {
         const ns = runState.nets && runState.nets[net.id];
         if (ns && (ns.hot || ns.amps > 0.001)) {
-          const lp = hub || netLabelPos(net);
+          const lp = hub || bendHandle || netLabelPos(net);
           if (lp) {
             const label = `${ns.volts.toFixed(1)}V · ${ns.amps.toFixed(2)}A`;
             cx.font = "9px ui-monospace, Menlo, monospace";
@@ -167,10 +177,11 @@
       }
     }
     hint(wireDrag && wireDrag.moved ? `release on a pin to connect ${wireDrag.from}` :
+      dragWireNet != null ? "dragging wire bend — release to drop, double-click it to straighten" :
       pending ? `wiring from ${pending} — click another pin, or drag from a pin (esc cancels)` :
       pickHandler ? "pick a pin…" :
       selInst ? `${selInst} selected — drag to move, R rotates, ✕ or Delete removes` :
-      selNet >= 0 ? "net selected — Delete removes it" : "");
+      selNet >= 0 ? "net selected — drag its path to bend it, double-click to straighten, Delete removes it" : "");
   }
   function roundRect(x, y, w, h, r) {
     cx.beginPath();

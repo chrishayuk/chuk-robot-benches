@@ -96,7 +96,7 @@
     ["esc", "motor"],
     ["mcu"],
     ["tof", "imu", "radio"],
-    ["led", "resistor", "buzzer", "button"],
+    ["led", "resistor", "potentiometer", "buzzer", "button"],
   ];
   function autoArrange() {
     const insts = Object.keys(nl.instances);
@@ -181,7 +181,7 @@
     ["brain", ["mcu"]],
     ["sensors", ["tof", "imu"]],
     ["radio", ["radio"]],
-    ["indicators & passives", ["led", "buzzer", "resistor", "button"]],
+    ["indicators & passives", ["led", "buzzer", "resistor", "potentiometer", "button"]],
   ];
   function renderPalette() {
     const el = document.getElementById("palette");
@@ -288,7 +288,7 @@
         if (e.target.value) net.signal = e.target.value; else delete net.signal;
         refresh();
       });
-      div.querySelector(".del").addEventListener("click", e => { e.stopPropagation(); nl.nets.splice(i, 1); selNet = -1; refresh(); });
+      div.querySelector(".del").addEventListener("click", e => { e.stopPropagation(); clearWireBend(net.id); nl.nets.splice(i, 1); selNet = -1; refresh(); });
       div.querySelector(".addpin").addEventListener("click", e => {
         e.stopPropagation();
         hint("pick a pin to add to " + net.id);

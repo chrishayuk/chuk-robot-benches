@@ -6,14 +6,21 @@
 // State (runMode, runState, runInputs, ...) lives in 01-state.js — see the
 // comment there for why.
 
+  // inst -> { row, readout, reason, toggle? } — the run panel's per-instance
+  // interactive elements, built once (see renderRunPanel). Only ever read
+  // from within run-mode functions (never during the initial synchronous
+  // page-load draw()), so no TDZ hazard declaring it here.
+  let runRowRefs = {};
+
   function defaultRunInputs() {
-    const inputs = { switches: {}, buttons: {}, throttles: {}, sensor_values: {} };
+    const inputs = { switches: {}, buttons: {}, throttles: {}, dial_positions: {}, sensor_values: {} };
     for (const [inst, partId] of Object.entries(nl.instances)) {
       const part = partById[partId];
       if (!part) continue;
       if (part.kind === "switch") inputs.switches[inst] = false;
       if (part.kind === "button") inputs.buttons[inst] = false;
       if (part.kind === "motor") inputs.throttles[inst] = 0;
+      if (part.kind === "potentiometer") inputs.dial_positions[inst] = 0.5;
       if (part.kind === "tof") inputs.sensor_values[inst] = part.range_mm ?? 0;
       if (part.kind === "imu") inputs.sensor_values[inst] = 0;
     }
@@ -28,6 +35,7 @@
   }
 
   function toggleSwitch(inst) { runInputs.switches[inst] = !runInputs.switches[inst]; updateRunState(); }
+  function setDialPosition(inst, v) { runInputs.dial_positions[inst] = v; updateRunState(); }
   function setButtonHeld(inst, held) { runInputs.buttons[inst] = held; updateRunState(); }
   function setThrottle(inst, v) { runInputs.throttles[inst] = v; updateRunState(); }
   function setSensorValue(inst, v) { runInputs.sensor_values[inst] = v; updateRunState(); }
@@ -93,46 +101,78 @@
     draw();
   }
 
+  // Each instance's row is built ONCE and its <input>/<button> elements are
+  // never destroyed afterward — only their surrounding readout text is
+  // patched on each tick. Rebuilding the whole panel on every input event
+  // (the previous design) ripped the very slider the user was mid-drag on
+  // out of the DOM the instant that drag's own `input` event re-rendered
+  // it, silently ending the gesture after a pixel of movement.
+  function buildRunPanelRow(inst, part) {
+    const row = document.createElement("div");
+    row.className = "row runrow";
+    let body = `<div class="hd"><b>${inst}</b> <span class="k">${part.kind}</span></div>`;
+    if (part.kind === "switch" || part.kind === "button") {
+      body += `<button class="mini runToggle" data-kind="${part.kind}"></button>`;
+    } else if (part.kind === "motor") {
+      body += `<input type="range" class="runThrottle" min="-1" max="1" step="0.05" value="${runInputs.throttles[inst] ?? 0}"> <span class="runReadout"></span>`;
+    } else if (part.kind === "potentiometer") {
+      body += `<input type="range" class="runDial" min="0" max="1" step="0.01" value="${runInputs.dial_positions[inst] ?? 0.5}"> <span class="runReadout"></span>`;
+    } else if (part.kind === "tof" || part.kind === "imu") {
+      body += `<input type="number" class="runSensor" value="${runInputs.sensor_values[inst] ?? 0}"> <span class="runReadout"></span>`;
+    } else {
+      body += `<span class="runReadout"></span>`;
+    }
+    body += `<div class="d runReason" style="margin-top:3px;color:var(--dim)"></div>`;
+    row.innerHTML = body;
+
+    const refs = { row, readout: row.querySelector(".runReadout"), reason: row.querySelector(".runReason") };
+    const toggle = row.querySelector(".runToggle");
+    if (toggle) {
+      refs.toggle = toggle;
+      if (part.kind === "switch") toggle.addEventListener("click", () => toggleSwitch(inst));
+      else toggle.addEventListener("pointerdown", () => { heldButtonInst = inst; setButtonHeld(inst, true); });
+    }
+    const throttle = row.querySelector(".runThrottle");
+    if (throttle) throttle.addEventListener("input", () => setThrottle(inst, parseFloat(throttle.value)));
+    const dial = row.querySelector(".runDial");
+    if (dial) dial.addEventListener("input", () => setDialPosition(inst, parseFloat(dial.value)));
+    const sensor = row.querySelector(".runSensor");
+    if (sensor) sensor.addEventListener("change", () => setSensorValue(inst, parseFloat(sensor.value) || 0));
+    return refs;
+  }
+
   function renderRunPanel() {
     const el = document.getElementById("runPanel");
-    if (!runMode) { el.innerHTML = ""; return; }
-    el.innerHTML = "";
+    if (!runMode) { el.innerHTML = ""; runRowRefs = {}; return; }
+
     for (const [inst, partId] of Object.entries(nl.instances)) {
+      if (runRowRefs[inst]) continue;
       const part = partById[partId];
       if (!part) continue;
-      const s = (runState.instances || {})[inst] || {};
-      let body = `<div class="hd"><b>${inst}</b> <span class="k">${part.kind}</span></div>`;
-      if (part.kind === "switch" || part.kind === "button") {
-        body += `<button class="mini runToggle" data-inst="${inst}" data-kind="${part.kind}">${s.closed ? "ON" : "off"}</button>`;
-      } else if (part.kind === "motor") {
-        body += `<input type="range" class="runThrottle" data-inst="${inst}" min="-1" max="1" step="0.05" value="${runInputs.throttles[inst] ?? 0}"> spin ${(s.spin ?? 0).toFixed(2)}` +
-          (s.current_a != null ? ` · ${s.current_a.toFixed(2)}A` : "");
-      } else if (part.kind === "tof" || part.kind === "imu") {
-        body += `<input type="number" class="runSensor" data-inst="${inst}" value="${runInputs.sensor_values[inst] ?? 0}"> ${s.powered ? "live" : "unpowered"}` +
-          (s.bus_conflict ? ` <span style="color:var(--bad);font-weight:700">ADDRESS CONFLICT</span>` : "");
-      } else if (s.powered !== undefined) {
-        body += ` — ${s.powered ? "powered" : "unpowered"}` + (s.current_a != null ? ` · ${s.current_a.toFixed(2)}A` : "");
-      }
-      if (s.reason) body += `<div class="d" style="margin-top:3px;color:var(--dim)">${s.reason}</div>`;
-      const row = document.createElement("div");
-      row.className = "row runrow";
-      row.innerHTML = body;
-      el.appendChild(row);
+      runRowRefs[inst] = buildRunPanelRow(inst, part);
+      el.appendChild(runRowRefs[inst].row);
     }
-    el.querySelectorAll(".runToggle").forEach(btn => {
-      const inst = btn.dataset.inst;
-      if (btn.dataset.kind === "switch") {
-        btn.addEventListener("click", () => toggleSwitch(inst));
-      } else {
-        btn.addEventListener("pointerdown", () => { heldButtonInst = inst; setButtonHeld(inst, true); });
+
+    for (const [inst, partId] of Object.entries(nl.instances)) {
+      const part = partById[partId];
+      const refs = runRowRefs[inst];
+      if (!part || !refs) continue;
+      const s = (runState.instances || {})[inst] || {};
+      if (refs.toggle) refs.toggle.textContent = s.closed ? "ON" : "off";
+      if (refs.readout) {
+        if (part.kind === "motor") {
+          refs.readout.textContent = `spin ${(s.spin ?? 0).toFixed(2)}` + (s.current_a != null ? ` · ${s.current_a.toFixed(2)}A` : "");
+        } else if (part.kind === "potentiometer") {
+          refs.readout.textContent = `${Math.round((runInputs.dial_positions[inst] ?? 0.5) * 100)}%`;
+        } else if (part.kind === "tof" || part.kind === "imu") {
+          refs.readout.innerHTML = `${s.powered ? "live" : "unpowered"}` +
+            (s.bus_conflict ? ` <span style="color:var(--bad);font-weight:700">ADDRESS CONFLICT</span>` : "");
+        } else if (s.powered !== undefined) {
+          refs.readout.textContent = `${s.powered ? "powered" : "unpowered"}` + (s.current_a != null ? ` · ${s.current_a.toFixed(2)}A` : "");
+        }
       }
-    });
-    el.querySelectorAll(".runThrottle").forEach(inp => {
-      inp.addEventListener("input", () => setThrottle(inp.dataset.inst, parseFloat(inp.value)));
-    });
-    el.querySelectorAll(".runSensor").forEach(inp => {
-      inp.addEventListener("change", () => setSensorValue(inp.dataset.inst, parseFloat(inp.value) || 0));
-    });
+      if (refs.reason) refs.reason.textContent = s.reason || "";
+    }
   }
 
   // Fallback label anchor for 2-pin nets (netSegments' `hub` is only set for
@@ -155,14 +195,41 @@
     const s = (runState.instances || {})[inst];
     if (!s) return;
     const kind = kindOf(inst);
-    if (kind === "led" && s.lit) {
-      cx.save();
-      cx.shadowColor = ledGlowColor(inst);
-      cx.shadowBlur = s.current_limited ? 16 : 28;
-      cx.fillStyle = ledGlowColor(inst);
-      cx.globalAlpha = 0.85;
-      cx.beginPath(); cx.arc(g.x, g.y, Math.min(g.w, g.h) / 2 + 4, 0, Math.PI * 2); cx.fill();
-      cx.restore();
+    if (kind === "led") {
+      const r = Math.min(g.w, g.h) / 2 + 4;
+      if (s.lit) {
+        // Brightness tracks live current (20mA ~ a typical indicator LED's
+        // rated forward current, used only as a "what counts as fully
+        // bright" reference for this glow — not a declared/authoritative
+        // figure). Gamma-corrected (^2.2, the standard display gamma): human
+        // brightness perception is far more sensitive at low light levels
+        // than current itself is linear, so a LINEAR current->alpha mapping
+        // still looks "clearly on" well below rated current — a dimmer
+        // pushed most of the way down needs to look convincingly dim, not
+        // just "a bit less bright". No alpha/blur floor either, so it can
+        // fade all the way toward the off-state look.
+        const linear = s.current_limited ? Math.min(1, (s.current_a ?? 0) / 0.02) : 1;
+        const brightness = s.current_limited ? Math.pow(linear, 2.2) : 1;
+        cx.save();
+        cx.shadowColor = ledGlowColor(inst);
+        cx.shadowBlur = s.current_limited ? 2 + brightness * 26 : 28;
+        cx.fillStyle = ledGlowColor(inst);
+        cx.globalAlpha = s.current_limited ? 0.04 + brightness * 0.81 : 0.85;
+        cx.beginPath(); cx.arc(g.x, g.y, r, 0, Math.PI * 2); cx.fill();
+        cx.restore();
+      } else {
+        // Clearly OFF, not just "no glow drawn" — a dim, outlined bulb in
+        // the LED's own color reads unambiguously as "off", where absence
+        // of any marking could just as easily read as "not rendered yet".
+        cx.save();
+        cx.fillStyle = ledGlowColor(inst);
+        cx.globalAlpha = 0.1;
+        cx.beginPath(); cx.arc(g.x, g.y, r, 0, Math.PI * 2); cx.fill();
+        cx.globalAlpha = 1;
+        cx.strokeStyle = "#565f66"; cx.lineWidth = 1.5;
+        cx.beginPath(); cx.arc(g.x, g.y, r, 0, Math.PI * 2); cx.stroke();
+        cx.restore();
+      }
     }
     if ((kind === "switch" || kind === "button") && s.closed) {
       cx.save();
@@ -206,14 +273,38 @@
     const s = (runState.instances || {})[inst];
     if (!s) return;
     const kind = kindOf(inst);
-    if (kind === "led" && s.lit) {
-      cx.save();
-      cx.shadowColor = ledGlowColor(inst);
-      cx.shadowBlur = s.current_limited ? 16 : 28;
-      cx.fillStyle = ledGlowColor(inst);
-      cx.globalAlpha = 0.85;
-      cx.beginPath(); cx.arc(q[0], q[1], 8, 0, Math.PI * 2); cx.fill();
-      cx.restore();
+    if (kind === "led") {
+      if (s.lit) {
+        // Brightness tracks live current (20mA ~ a typical indicator LED's
+        // rated forward current, used only as a "what counts as fully
+        // bright" reference for this glow — not a declared/authoritative
+        // figure). Gamma-corrected (^2.2, the standard display gamma): human
+        // brightness perception is far more sensitive at low light levels
+        // than current itself is linear, so a LINEAR current->alpha mapping
+        // still looks "clearly on" well below rated current — a dimmer
+        // pushed most of the way down needs to look convincingly dim, not
+        // just "a bit less bright". No alpha/blur floor either, so it can
+        // fade all the way toward the off-state look.
+        const linear = s.current_limited ? Math.min(1, (s.current_a ?? 0) / 0.02) : 1;
+        const brightness = s.current_limited ? Math.pow(linear, 2.2) : 1;
+        cx.save();
+        cx.shadowColor = ledGlowColor(inst);
+        cx.shadowBlur = s.current_limited ? 2 + brightness * 26 : 28;
+        cx.fillStyle = ledGlowColor(inst);
+        cx.globalAlpha = s.current_limited ? 0.04 + brightness * 0.81 : 0.85;
+        cx.beginPath(); cx.arc(q[0], q[1], 8, 0, Math.PI * 2); cx.fill();
+        cx.restore();
+      } else {
+        // Clearly OFF, not just "no glow drawn" — see the 2D overlay for why.
+        cx.save();
+        cx.fillStyle = ledGlowColor(inst);
+        cx.globalAlpha = 0.1;
+        cx.beginPath(); cx.arc(q[0], q[1], 8, 0, Math.PI * 2); cx.fill();
+        cx.globalAlpha = 1;
+        cx.strokeStyle = "#565f66"; cx.lineWidth = 1.5;
+        cx.beginPath(); cx.arc(q[0], q[1], 8, 0, Math.PI * 2); cx.stroke();
+        cx.restore();
+      }
     }
     if ((kind === "switch" || kind === "button") && s.closed) {
       cx.fillStyle = "#57b48f";

@@ -1,0 +1,16 @@
+{
+  "id": "potentiometer-10k",
+  "kind": "potentiometer",
+  "mass_g": 1.0,
+  "provisional": true,
+  "ohms_min": 20.0,
+  "ohms_max": 10000.0,
+  "notes": "10k linear pot wired as a 2-terminal rheostat (wiper strapped to one end); dial at 0.0 = min resistance (brightest), 1.0 = max resistance (dimmest)",
+  "description": "A variable resistor: twist the dial and the resistance — and so the current it lets through — changes live. Wired here as a simple two-leg rheostat, the same role a fixed resistor plays, except the value moves.",
+  "elec": {
+    "pins": {
+      "P1": { "role": "passive" },
+      "P2": { "role": "passive" }
+    }
+  }
+}

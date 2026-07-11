@@ -220,12 +220,15 @@ rather than a guess.
   broken variants (swapped polarity, dual-0x29, missing switch) fail with correct
   E-codes.*
 - **M0.5:** interactive run mode (§3a), in the standalone `robosim` crate — click-to-
-  toggle switch/button, throttle + fake-sensor controls, event-driven net energization,
-  real Ohm's-law voltage/current per net and component (resistor `ohms`, LED
-  `forward_v`, motor winding resistance, fixed-power equivalent resistance — never a
-  fixed figure), no firmware/timeline. Depends only on M0 (schema + checks), not on
-  M1's power graph. *Acceptance: a green `run_state` test suite against the MVP wedge
-  harness and a dedicated demo harness exercising switch+LED+motor+sensor+button,
+  toggle switch/button, throttle + fake-sensor + dial controls, event-driven net
+  energization, real Ohm's-law voltage/current per net and component (resistor
+  `ohms`, potentiometer live `ohms` from dial position, LED `forward_v`, motor winding
+  resistance, fixed-power equivalent resistance — never a fixed figure), animated
+  wire-flow visualization, user-draggable wire bend points (2D, 3D, and while running),
+  a weighted auto-arrange pass, no firmware/timeline. Depends only on M0 (schema +
+  checks), not on M1's power graph. *Acceptance: a green `run_state` test suite against
+  the MVP wedge harness and dedicated demo harnesses exercising
+  switch+LED+motor+sensor+button and a potentiometer dimmer,
   including tests proving current changes when voltage does.*
 - **M1:** power budget checks (E30–E32) + power graph derivation into RobotSpec; wiring
   mass derivation.

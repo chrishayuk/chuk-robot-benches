@@ -35,6 +35,22 @@
       const selW = i === selNet;
       if (flowing) cx.lineDashOffset = -spinPhase * 14;
       for (const arc of netArcs3(net, i)) stroke3(arc, col, selW ? 3 : 1.8, flowing, true);
+      if (!runMode) {
+        const bend = net.pins.length === 2 ? wireBendOf(net.id) : null;
+        if (bend) {
+          const ends = net.pins.map(pin3).filter(Boolean);
+          const z = bend[2] != null ? bend[2] : defaultWireLift3(net, i, ends);
+          const q = project3([bend[0], bend[1], z]);
+          if (q) {
+            const s = i === selNet || dragWireNet === i ? 5 : 3.6;
+            cx.fillStyle = i === selNet || dragWireNet === i ? "#e8a33d" : col;
+            cx.beginPath();
+            cx.moveTo(q[0], q[1] - s); cx.lineTo(q[0] + s, q[1]);
+            cx.lineTo(q[0], q[1] + s); cx.lineTo(q[0] - s, q[1]);
+            cx.closePath(); cx.fill();
+          }
+        }
+      }
     });
     for (const bus of (layerOn.i2c ? nl.buses : [])) {
       const m = pin3(bus.sda);

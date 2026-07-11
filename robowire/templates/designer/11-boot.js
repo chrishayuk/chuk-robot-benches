@@ -1,8 +1,26 @@
 // designer/11-boot.js — event wiring + startup — original execution order preserved
+  // The height a fresh wire-bend drag should slide across: the bend's own
+  // stored height if it has one, else the same default altitude the
+  // no-bend 3D arc would use — so grabbing an unbent wire doesn't make it
+  // jump before you've even moved the pointer.
+  function startWireDragZ(net, wi) {
+    const bend = wireBendOf(net.id);
+    if (bend && bend[2] != null) return bend[2];
+    const ends = net.pins.map(pin3).filter(Boolean);
+    return ends.length === 2 ? defaultWireLift3(net, wi, ends) : 40;
+  }
   cv.addEventListener("pointerdown", e => {
     const mx = e.offsetX, my = e.offsetY;
     if (runMode) {
-      if (handleRunPointerDown(mx, my)) cv.setPointerCapture(e.pointerId);
+      if (handleRunPointerDown(mx, my)) { cv.setPointerCapture(e.pointerId); return; }
+      // Not a switch/button: bending a wire's path is a layout change, not a
+      // netlist edit, so it's allowed even while the simulation is running.
+      const wi = wireAt(mx, my);
+      if (wi >= 0) {
+        dragWireNet = wi; dragWireMoved = false;
+        if (mode === "3d") dragWireZ = startWireDragZ(nl.nets[wi], wi);
+        cv.setPointerCapture(e.pointerId);
+      }
       return;
     }
     const pin = pinAt(mx, my);
@@ -26,6 +44,11 @@
     const wi = wireAt(mx, my);
     if (wi >= 0) {
       selNet = wi; selInst = null;
+      // Press starts a potential wire-bend drag; a plain click (no move by
+      // pointerup) leaves the existing select behaviour untouched.
+      dragWireNet = wi; dragWireMoved = false;
+      if (mode === "3d") dragWireZ = startWireDragZ(nl.nets[wi], wi);
+      cv.setPointerCapture(e.pointerId);
       renderNets(); renderSelInfo(); draw();
       const row = document.querySelectorAll("#nets .row")[wi];
       if (row) row.scrollIntoView({ block: "nearest" });
@@ -53,6 +76,18 @@
     renderNets(); renderSelInfo(); draw();
   });
   cv.addEventListener("pointermove", e => {
+    if (dragWireNet != null) {
+      dragWireMoved = true;
+      const netId = nl.nets[dragWireNet].id;
+      if (mode === "3d") {
+        const pt = unproject3(e.offsetX, e.offsetY, dragWireZ);
+        if (pt) setWireBend3D(netId, pt[0], pt[1], pt[2]);
+      } else {
+        setWireBend2D(netId, e.offsetX, e.offsetY);
+      }
+      draw();
+      return;
+    }
     if (wireDrag) {
       wireDrag.cur = [e.offsetX, e.offsetY];
       if (!wireDrag.moved) {
@@ -91,6 +126,14 @@
     }
   });
   cv.addEventListener("pointerup", e => {
+    // Checked before the runMode early-return below: bending a wire's path
+    // is a layout change, not a netlist edit, so it works while running too.
+    if (dragWireNet != null) {
+      if (dragWireMoved) saveLayout();
+      dragWireNet = null;
+      draw();
+      return;
+    }
     if (runMode) return; // release is handled globally (see 12-run.js) — a
     // hold started from the side panel may release off-canvas.
     if (wireDrag) {
@@ -111,6 +154,10 @@
     }
     if (dragInst) { dragInst = null; saveLayout(); }
     if (orbiting) { orbiting = false; cv.classList.remove("dragging"); }
+  });
+  cv.addEventListener("dblclick", e => {
+    const wi = wireAt(e.offsetX, e.offsetY);
+    if (wi >= 0) { clearWireBend(nl.nets[wi].id); saveLayout(); draw(); }
   });
   cv.addEventListener("wheel", e => {
     if (mode !== "3d") return;
@@ -152,7 +199,7 @@
       return;
     }
     if ((e.key === "Delete" || e.key === "Backspace")) {
-      if (selNet >= 0) { nl.nets.splice(selNet, 1); selNet = -1; refresh(); }
+      if (selNet >= 0) { clearWireBend(nl.nets[selNet].id); nl.nets.splice(selNet, 1); selNet = -1; refresh(); }
       else if (selInst) { removeInstance(selInst); refresh(); }
       e.preventDefault();
     }

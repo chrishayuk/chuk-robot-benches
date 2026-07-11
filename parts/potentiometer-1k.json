@@ -1,0 +1,16 @@
+{
+  "id": "potentiometer-1k",
+  "kind": "potentiometer",
+  "mass_g": 0.8,
+  "provisional": true,
+  "ohms_min": 100.0,
+  "ohms_max": 1000.0,
+  "notes": "1k linear pot wired as a 2-terminal rheostat (wiper strapped to one end); dial at 0.0 = min resistance (brightest), 1.0 = max resistance (dimmest)",
+  "description": "A smaller-range variable resistor than the 10k — a 10x span instead of 500x, so the whole dial does something useful for a single LED dimmer instead of cramming the visible brightness range into the first few percent of travel.",
+  "elec": {
+    "pins": {
+      "P1": { "role": "passive" },
+      "P2": { "role": "passive" }
+    }
+  }
+}
