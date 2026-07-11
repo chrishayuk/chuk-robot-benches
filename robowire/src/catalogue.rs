@@ -22,6 +22,10 @@ pub struct ElecPart {
     pub id: String,
     pub kind: String,
     #[serde(default)]
+    pub mass_g: f64,
+    #[serde(default)]
+    pub notes: String,
+    #[serde(default)]
     pub elec: Option<Elec>,
 }
 

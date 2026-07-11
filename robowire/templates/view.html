@@ -38,6 +38,36 @@
   }
   #tip .wid { color: var(--accent); font-weight: 700; }
   #help { bottom: 14px; right: 14px; color: var(--dim); font-size: 11px; }
+  #inspector {
+    top: 50%; right: 14px; transform: translateY(-50%);
+    width: 330px; max-height: 72vh; overflow-y: auto; display: none;
+  }
+  #inspector h2 {
+    margin: 0 0 2px; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase;
+    font-family: "Avenir Next Condensed", "Arial Narrow", sans-serif;
+  }
+  #inspector .chip {
+    display: inline-block; font-size: 10px; letter-spacing: 0.1em; padding: 1px 8px;
+    border-radius: 3px; font-weight: 700; color: #0d1114; margin-bottom: 8px;
+  }
+  #inspector .kv { display: grid; grid-template-columns: 74px 1fr; gap: 3px 10px; font-size: 12px; }
+  #inspector .kv dt { color: var(--dim); margin: 0; }
+  #inspector .kv dd { margin: 0; font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+  #inspector .note { color: var(--dim); font-size: 11.5px; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; text-wrap: pretty; }
+  #inspector .conn {
+    display: block; width: 100%; text-align: left; margin-top: 6px; padding: 6px 8px;
+    background: #1d2429; border: 1px solid var(--line); border-radius: 4px; color: var(--ink);
+    font: 11px ui-monospace, Menlo, monospace; cursor: pointer;
+  }
+  #inspector .conn:hover, #inspector .conn:focus-visible { border-color: var(--accent); outline: none; }
+  #inspector .conn .lane { font-weight: 700; }
+  #inspector .conn .who { color: var(--dim); }
+  #inspector .close {
+    float: right; background: none; border: 1px solid var(--line); color: var(--dim);
+    border-radius: 4px; cursor: pointer; font-size: 11px; padding: 1px 8px;
+  }
+  #inspector .ends { font-size: 11.5px; font-family: ui-monospace, Menlo, monospace; margin: 8px 0 0; padding-left: 0; list-style: none; }
+  #inspector .ends li { margin-top: 4px; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -45,7 +75,8 @@
 <div class="hud" id="title"><h1 id="name">harness</h1><div class="sub">wiring on the geometry it belongs to — drag to orbit, wheel to zoom, hover a wire</div></div>
 <div class="hud" id="legend"></div>
 <div class="hud" id="tip"><span class="wid" id="tipname"></span><div id="tipends"></div></div>
-<div class="hud" id="help">robowire view · local file · nothing leaves this machine</div>
+<div class="hud" id="inspector"></div>
+<div class="hud" id="help">robowire view · local file · nothing leaves this machine · esc clears selection</div>
 <script>
 const SCENE =
 //__SCENE__
@@ -93,7 +124,12 @@ const SCENE =
   const enabled = {};
   for (const w of SCENE.wires) enabled[w.class] = true;
   let hover = null; // wire index
-  let focusNode = null;
+  // Selection: {type:'node', id} or {type:'wire', family} where family
+  // matches wire.id with any "~k" junction suffix stripped.
+  let sel = null;
+  const family = id => id.split("~")[0];
+  const wireSelected = w => sel && sel.type === "wire" && family(w.id) === sel.family;
+  const focusNodeId = () => (sel && sel.type === "node" ? sel.id : null);
 
   // legend
   const legend = document.getElementById("legend");
@@ -174,13 +210,14 @@ const SCENE =
     }
 
     // nodes (boxes + labels)
+    const fn = focusNodeId();
     for (const n of SCENE.nodes) {
-      const dimmed = focusNode && n.id !== focusNode && !wireTouches(focusNode, n.id);
+      const dimmed = fn && n.id !== fn && !wireTouches(fn, n.id);
       cx.globalAlpha = dimmed ? 0.25 : 1;
       for (const e of boxEdges(n)) strokePolyline(e, "#77848c", 1.2 * dpr, false, false);
       const q = project([n.pos[0], n.pos[1], n.pos[2] + n.size[2] / 2 + 5]);
       if (q) {
-        cx.fillStyle = n.id === focusNode ? "#e8a33d" : "#c7ced2";
+        cx.fillStyle = n.id === fn ? "#e8a33d" : "#c7ced2";
         cx.font = `${11 * dpr}px ui-monospace, Menlo, monospace`;
         cx.fillText(n.id, q[0] - 10 * dpr, q[1]);
       }
@@ -190,8 +227,10 @@ const SCENE =
     // wires
     SCENE.wires.forEach((w, i) => {
       if (!enabled[w.class]) return;
-      const isHover = i === hover;
-      const touched = !focusNode || w.ends.some(e => e.startsWith(focusNode + "."));
+      const isHover = i === hover || wireSelected(w);
+      const touched =
+        (!fn || w.ends.some(e => e.startsWith(fn + "."))) &&
+        (!sel || sel.type !== "wire" || wireSelected(w));
       cx.globalAlpha = touched ? 1 : 0.12;
       const color = COLORS[w.class] || "#999";
       strokePolyline(w.pts, color, (isHover ? 3.4 : 1.9) * dpr, w.dashed, true);
@@ -228,13 +267,79 @@ const SCENE =
   });
   cv.addEventListener("pointerup", e => {
     dragging = false; cv.classList.remove("dragging");
-    // click (no drag): node focus toggle
+    // click (no drag): wire first, then node, then clear.
     if (Math.hypot(e.clientX - lx, e.clientY - ly) < 4) {
-      const n = pickNode(e.clientX * dpr, e.clientY * dpr);
-      focusNode = n && n !== focusNode ? n : null;
-      draw();
+      const wi = pickWire(e.clientX * dpr, e.clientY * dpr);
+      if (wi !== null) {
+        select({ type: "wire", family: family(SCENE.wires[wi].id), idx: wi });
+      } else {
+        const n = pickNode(e.clientX * dpr, e.clientY * dpr);
+        if (n && !(sel && sel.type === "node" && sel.id === n)) select({ type: "node", id: n });
+        else select(null);
+      }
     }
   });
+  window.addEventListener("keydown", e => {
+    if (e.key === "Escape") select(null);
+  });
+
+  // ---- inspector -----------------------------------------------------------
+  const insp = document.getElementById("inspector");
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+  function select(next) {
+    sel = next;
+    renderInspector();
+    draw();
+  }
+  function chipHtml(cls) {
+    const col = COLORS[cls] || "#999";
+    return `<span class="chip" style="background:${col}">${esc(CLASS_LABELS[cls] || cls)}</span>`;
+  }
+  function renderInspector() {
+    if (!sel) { insp.style.display = "none"; return; }
+    insp.style.display = "block";
+    if (sel.type === "wire") {
+      const w = SCENE.wires[sel.idx] ||
+        SCENE.wires.find(x => family(x.id) === sel.family);
+      insp.innerHTML =
+        `<button class="close" id="inspClose">close</button>` +
+        `<h2>${esc(family(w.id))}</h2>${chipHtml(w.class)}` +
+        `<dl class="kv"><dt>carries</dt><dd>${esc(w.carries)}</dd></dl>` +
+        `<ul class="ends">` +
+        w.ends_detail.map(d => `<li>· ${esc(d)}</li>`).join("") +
+        `</ul>` +
+        (w.note ? `<div class="note">${esc(w.note)}</div>` : "");
+    } else {
+      const n = SCENE.nodes.find(x => x.id === sel.id);
+      if (!n) { insp.style.display = "none"; return; }
+      insp.innerHTML =
+        `<button class="close" id="inspClose">close</button>` +
+        `<h2>${esc(n.id)}</h2><span class="chip" style="background:#8b969b">${esc(n.kind)}</span>` +
+        `<dl class="kv">` +
+        n.detail.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("") +
+        `</dl>` +
+        `<div class="note">connections — click one to trace it:</div>` +
+        n.conns
+          .map(
+            (c, i) =>
+              `<button class="conn" data-net="${esc(c.net)}">` +
+              `<span class="lane" style="color:${COLORS[c.class] || "#999"}">${esc(n.id)}.${esc(c.pin)}</span>` +
+              ` — ${esc(c.role)}<br><span class="who">${esc(c.net)} → ${esc(c.others)}</span></button>`
+          )
+          .join("");
+      insp.querySelectorAll(".conn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const fam = btn.dataset.net;
+          const idx = SCENE.wires.findIndex(x => family(x.id) === fam);
+          if (idx >= 0) select({ type: "wire", family: fam, idx });
+        });
+      });
+    }
+    const closeBtn = document.getElementById("inspClose");
+    if (closeBtn) closeBtn.addEventListener("click", () => select(null));
+  }
   cv.addEventListener("pointermove", e => {
     if (dragging) {
       yaw += (e.clientX - lx) * 0.008;
