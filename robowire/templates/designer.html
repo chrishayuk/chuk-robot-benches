@@ -504,14 +504,6 @@ const WASM_B64 =
     }
     return m;
   }
-  function bezPoint(a, b, t) {
-    const mx = (a[0] + b[0]) / 2;
-    const u = 1 - t;
-    // cubic with P1=(mx, ay), P2=(mx, by) — matches the draw call.
-    const x = u*u*u*a[0] + 3*u*u*t*mx + 3*u*t*t*mx + t*t*t*b[0];
-    const y = u*u*u*a[1] + 3*u*u*t*a[1] + 3*u*t*t*b[1] + t*t*t*b[1];
-    return [x, y];
-  }
   function wireAt(mx, my) {
     for (let i = nl.nets.length - 1; i >= 0; i--) {
       const net = nl.nets[i];
@@ -688,66 +680,15 @@ const WASM_B64 =
     for (let g = 0; g < cv.clientWidth; g += 24) { cx.beginPath(); cx.moveTo(g, 0); cx.lineTo(g, cv.clientHeight); cx.stroke(); }
     for (let g = 0; g < cv.clientHeight; g += 24) { cx.beginPath(); cx.moveTo(0, g); cx.lineTo(cv.clientWidth, g); cx.stroke(); }
 
-    // wires
-    nl.nets.forEach((net, i) => {
-      const cls = netClass(net);
-      if (!layerOn[cls]) return;
-      const col = COLORS[cls] || "#999";
-      const { legs, segs, hub } = netSegments(net);
-      cx.strokeStyle = col;
-      cx.lineWidth = i === selNet ? 3 : 1.8;
-      cx.shadowColor = col; cx.shadowBlur = i === selNet ? 12 : 5;
-      for (const [a, b] of legs) {
-        cx.beginPath(); cx.moveTo(a[0], a[1]); cx.lineTo(b[0], b[1]); cx.stroke();
-      }
-      for (const [a, b] of segs) {
-        cx.beginPath();
-        cx.moveTo(a[0], a[1]);
-        const mx = (a[0] + b[0]) / 2;
-        cx.bezierCurveTo(mx, a[1], mx, b[1], b[0], b[1]);
-        cx.stroke();
-      }
-      cx.shadowBlur = 0;
-      if (hub) { cx.fillStyle = col; cx.beginPath(); cx.arc(hub[0], hub[1], 3.4, 0, Math.PI * 2); cx.fill(); }
-      // Selected net: name every endpoint right where it lands.
-      if (i === selNet) {
-        cx.font = "bold 9px ui-monospace, Menlo, monospace";
-        for (const ep of net.pins) {
-          const q = pinXY(ep);
-          if (!q) continue;
-          const lx = q[0] + (q[2] || 0) * (STUB + 6), ly = q[1] + (q[3] || 0) * (STUB + 6);
-          cx.fillStyle = "#0d1114";
-          const wdt = cx.measureText(ep).width;
-          cx.fillRect(lx - (q[2] < 0 ? wdt : 0) - 2, ly - 8, wdt + 4, 11);
-          cx.fillStyle = col;
-          cx.textAlign = q[2] < 0 ? "right" : "left";
-          cx.fillText(ep, lx, ly);
-          cx.textAlign = "left";
-        }
-      }
-    });
-    // bus wires
-    for (const bus of (layerOn.i2c ? nl.buses : [])) {
-      const m = pinXY(bus.sda);
-      if (!m) continue;
-      for (const dev of bus.devices) {
-        const dpin = pinXY(dev.inst + ".SDA");
-        if (!dpin) continue;
-        cx.strokeStyle = COLORS.i2c; cx.lineWidth = 1.8; cx.setLineDash([7, 4]);
-        cx.beginPath();
-        cx.moveTo(m[0], m[1]);
-        const mx = (m[0] + dpin[0]) / 2;
-        cx.bezierCurveTo(mx, m[1], mx, dpin[1], dpin[0], dpin[1]);
-        cx.stroke(); cx.setLineDash([]);
-      }
-    }
+    const pinColors = computePinColors();
 
-    // boxes
+    // 1) boxes (bodies + titles + badge) — under the wires, so a crossing
+    // wire visibly crosses instead of appearing to terminate on the body.
     for (const inst of Object.keys(nl.instances)) {
       if (!instVisible(inst)) continue;
       const g = boxGeo(inst);
-      cx.fillStyle = "#1a2126";
       const isSel = inst === selInst;
+      cx.fillStyle = "#1a2126";
       cx.strokeStyle = isSel || (pending && splitPin(pending)[0] === inst) ? "#e8a33d" : "#4a575f";
       cx.lineWidth = isSel ? 2.2 : 1.4;
       roundRect(g.x - g.w / 2, g.y - g.h / 2, g.w, g.h, 6);
@@ -759,7 +700,6 @@ const WASM_B64 =
       cx.font = "9px ui-monospace, Menlo, monospace";
       cx.fillText(nl.instances[inst], g.x - g.w / 2 + 8, g.y - g.h / 2 + 27);
       if (isSel) {
-        // removal badge, top-right of the selected box
         cx.fillStyle = "#e05c50";
         cx.beginPath(); cx.arc(g.x + g.w / 2 - 2, g.y - g.h / 2 + 2, 8, 0, Math.PI * 2); cx.fill();
         cx.fillStyle = "#0d1114";
@@ -770,7 +710,7 @@ const WASM_B64 =
       }
     }
 
-    // wires over the boxes
+    // 2) wires (lead stubs + exit-directed cubics), over the boxes
     nl.nets.forEach((net, i) => {
       const cls = netClass(net);
       if (!layerOn[cls]) return;
@@ -806,6 +746,7 @@ const WASM_B64 =
         }
       }
     });
+    // bus wires
     for (const bus of (layerOn.i2c ? nl.buses : [])) {
       const m = pinXY(bus.sda);
       if (!m) continue;
@@ -823,7 +764,7 @@ const WASM_B64 =
       }
     }
 
-    // pins LAST — always visible plugs on top of everything
+    // 3) pins — always-on-top plugs (colored = wired, hollow = free)
     for (const inst of Object.keys(nl.instances)) {
       if (!instVisible(inst)) continue;
       const g = boxGeo(inst);
@@ -848,7 +789,7 @@ const WASM_B64 =
         cx.textAlign = "left";
       }
     }
-    // pending wire rubber band hint
+
     if (wireDrag && wireDrag.moved) {
       const sp = pinXY(wireDrag.from);
       if (sp) {
@@ -862,96 +803,6 @@ const WASM_B64 =
       pickHandler ? "pick a pin…" :
       selInst ? `${selInst} selected — drag to move, R rotates, ✕ or Delete removes` :
       selNet >= 0 ? "net selected — Delete removes it" : "");
-  }
-  function stroke3(pts, color, width, dashed, glow) {
-    cx.beginPath();
-    let started = false;
-    for (const p of pts) {
-      const q = project3(p);
-      if (!q) { started = false; continue; }
-      if (!started) { cx.moveTo(q[0], q[1]); started = true; }
-      else cx.lineTo(q[0], q[1]);
-    }
-    cx.strokeStyle = color; cx.lineWidth = width;
-    cx.setLineDash(dashed ? [6, 5] : []);
-    if (glow) { cx.shadowColor = color; cx.shadowBlur = 9; }
-    cx.stroke();
-    cx.shadowBlur = 0; cx.setLineDash([]);
-  }
-  function draw3() {
-    pc = planeCenter();
-    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    cx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
-    // floor grid around the plane centre
-    for (let g = -300; g <= 300; g += 60) {
-      stroke3([[pc[0] + g, pc[1] - 300, 0], [pc[0] + g, pc[1] + 300, 0]], "#151b20", 1, false, false);
-      stroke3([[pc[0] - 300, pc[1] + g, 0], [pc[0] + 300, pc[1] + g, 0]], "#151b20", 1, false, false);
-    }
-    // wires (arcs, lifted — height separation is the point of this view)
-    nl.nets.forEach((net, i) => {
-      const cls = netClass(net);
-      if (!layerOn[cls]) return;
-      const col = COLORS[cls] || "#999";
-      const selW = i === selNet;
-      for (const arc of netArcs3(net, i)) stroke3(arc, col, selW ? 3 : 1.8, false, true);
-    });
-    for (const bus of (layerOn.i2c ? nl.buses : [])) {
-      const m = pin3(bus.sda);
-      if (!m) continue;
-      for (const dev of bus.devices) {
-        const d = pin3(dev.inst + ".SDA");
-        if (d) stroke3(arc3(m, d, CLASS_LIFT.i2c), COLORS.i2c, 1.8, true, true);
-      }
-    }
-    // boxes
-    const pinColors3 = computePinColors();
-    for (const inst of Object.keys(nl.instances)) {
-      if (!instVisible(inst)) continue;
-      const g = geo3(inst);
-      const isSel = inst === selInst;
-      const col = isSel || (pending && splitPin(pending)[0] === inst) ? "#e8a33d" : "#5b6a73";
-      const c = [];
-      for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [0, 1])
-        c.push([g.x + sx * g.W / 2, g.y + sy * g.D / 2, sz * g.h]);
-      const edges = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
-      for (const [a, b] of edges) stroke3([c[a], c[b]], col, isSel ? 2 : 1.2, false, false);
-      const q = project3([g.x, g.y, g.h + 10]);
-      if (q) {
-        cx.fillStyle = isSel ? "#e8a33d" : "#c7ced2";
-        cx.font = "11px ui-monospace, Menlo, monospace";
-        cx.fillText(inst, q[0] - 12, q[1]);
-      }
-      for (const [pin, pp] of Object.entries(g.pinPos3)) {
-        const ep = inst + "." + pin;
-        const q2 = project3(pp);
-        if (!q2) continue;
-        const active = pending === ep;
-        const wired = pinColors3[ep];
-        if (active) {
-          cx.fillStyle = "#e8a33d";
-          cx.beginPath(); cx.arc(q2[0], q2[1], 5, 0, Math.PI * 2); cx.fill();
-        } else if (wired) {
-          cx.fillStyle = wired;
-          cx.beginPath(); cx.arc(q2[0], q2[1], 3.6, 0, Math.PI * 2); cx.fill();
-        } else {
-          cx.strokeStyle = "#6b787f"; cx.lineWidth = 1;
-          cx.beginPath(); cx.arc(q2[0], q2[1], 2.8, 0, Math.PI * 2); cx.stroke();
-        }
-      }
-    }
-    if (wireDrag && wireDrag.moved) {
-      const wp = pin3(wireDrag.from);
-      const sp = wp && project3(wp);
-      if (sp) {
-        cx.strokeStyle = "#e8a33d"; cx.lineWidth = 1.6; cx.setLineDash([6, 4]);
-        cx.beginPath(); cx.moveTo(sp[0], sp[1]); cx.lineTo(wireDrag.cur[0], wireDrag.cur[1]); cx.stroke();
-        cx.setLineDash([]);
-      }
-    }
-    hint(wireDrag && wireDrag.moved ? `release on a pin to connect ${wireDrag.from}` :
-      pending ? `wiring from ${pending} — click another pin, or drag from a pin (esc cancels)` :
-      pickHandler ? "pick a pin…" :
-      "3D — drag empty space to orbit, wheel to zoom; switch to 2D to rearrange");
   }
   function roundRect(x, y, w, h, r) {
     cx.beginPath();
