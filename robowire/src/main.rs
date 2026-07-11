@@ -136,7 +136,30 @@ fn cmd_design(args: &[String]) {
     }
     let examples_json = serde_json::to_string(&examples).unwrap();
 
-    let template = include_str!("../templates/designer.html");
+    // The designer ships as one self-contained file but is AUTHORED as
+    // components: shell + thematic JS modules, assembled here. Edit the
+    // modules, never the assembled artifact.
+    const MODULES: [&str; 12] = [
+        include_str!("../templates/designer/00-wasm.js"),
+        include_str!("../templates/designer/01-state.js"),
+        include_str!("../templates/designer/02-prose.js"),
+        include_str!("../templates/designer/03-geom2d.js"),
+        include_str!("../templates/designer/04-geom3d.js"),
+        include_str!("../templates/designer/05-edit.js"),
+        include_str!("../templates/designer/06-hittest.js"),
+        include_str!("../templates/designer/07-render2d.js"),
+        include_str!("../templates/designer/08-render3d.js"),
+        include_str!("../templates/designer/09-panels.js"),
+        include_str!("../templates/designer/10-io.js"),
+        include_str!("../templates/designer/11-boot.js"),
+    ];
+    let script = format!(
+        "(async function () {{\n  \"use strict\";\n{}\n}})();",
+        MODULES.join("\n")
+    );
+    let shell = include_str!("../templates/designer/shell.html");
+    let template = shell.replace("//__MODULES__", &script);
+    let template = template.as_str();
     // Deterministic build id: template + wasm content hash, so a screenshot
     // always identifies exactly which build rendered it.
     let build_id = {

@@ -31,6 +31,13 @@ another's internals.
 Module directories appear when their first code lands (robotspec derivation library,
 robotspec-viewer prototype); specs precede code, per house discipline.
 
+## Dev rituals
+
+- **Designer changes:** edit `robowire/templates/designer/*.js` modules (never an
+  assembled artifact), then `cargo build --release` in `robowire/` (templates are
+  compiled in), regenerate, and run `node tools/verify-designer.mjs` against the
+  output. The page's corner stamp identifies the build in any screenshot.
+
 ## Boundaries
 
 - **chuk-arena** consumes RobotSpecs; it never defines robot identity.
