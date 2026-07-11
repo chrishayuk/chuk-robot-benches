@@ -98,6 +98,7 @@
   <h1>robowire <span style="color:var(--accent)">designer</span></h1>
   <input id="nlname" title="netlist name">
   <span class="spacer"></span>
+  <button id="modeBtn">3D view</button>
   <button id="importBtn">import</button>
   <button id="exportBtn" class="primary">export netlist</button>
 </header>
@@ -229,6 +230,81 @@ const WASM_B64 =
     return g.pinPos[pin] || null;
   }
 
+  let mode = "2d";
+  let yaw = -0.7, pitch = 0.5, dist = 900;
+  let orbiting = false;
+  const KIND_H = { battery: 30, esc: 16, mcu: 12, motor: 26, switch: 14, tof: 10, imu: 10, radio: 10, wiring: 8 };
+  function planeCenter() {
+    const insts = Object.keys(nl.instances).filter(instVisible);
+    if (!insts.length) return [0, 0];
+    let sx = 0, sy = 0;
+    for (const i of insts) { const g = boxGeo(i); sx += g.x; sy += g.y; }
+    return [sx / insts.length, sy / insts.length];
+  }
+  let pc = [0, 0];
+  function project3(pt) {
+    // world: x right, y "south" on the floor plane (from 2D layout), z up.
+    const dx = pt[0] - pc[0], dy = pt[1] - pc[1], dz = pt[2] - 0;
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const x1 = dx * cy - dy * sy, y1 = dx * sy + dy * cy;
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const y2 = y1 * cp - dz * sp;
+    const z2 = y1 * sp + dz * cp;
+    const depth = dist + y2;
+    if (depth < 40) return null;
+    const f = 900 / depth;
+    return [cv.clientWidth / 2 + x1 * f, cv.clientHeight / 2 - z2 * f + 80];
+  }
+  function geo3(inst) {
+    const g = boxGeo(inst);
+    const kind = kindOf(inst);
+    const h = KIND_H[kind] || 12;
+    const W = 74, D = 52;
+    const pins = pinsOf(inst);
+    const pinPos3 = {};
+    pins.forEach((pin, i) => {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      const rows = Math.ceil(pins.length / 2);
+      const t = rows > 1 ? row / (rows - 1) : 0.5;
+      pinPos3[pin] = [g.x + side * W / 2, g.y - D / 2 + t * D, h];
+    });
+    return { x: g.x, y: g.y, W, D, h, pinPos3 };
+  }
+  function pin3(ep) {
+    const [inst, pin] = splitPin(ep);
+    if (!(inst in nl.instances) || !instVisible(inst)) return null;
+    return geo3(inst).pinPos3[pin] || null;
+  }
+  function arc3(a, b, lift) {
+    const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, Math.max(a[2], b[2]) + lift];
+    const pts = [];
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12, u = 1 - t;
+      pts.push([
+        u * u * a[0] + 2 * u * t * mid[0] + t * t * b[0],
+        u * u * a[1] + 2 * u * t * mid[1] + t * t * b[1],
+        u * u * a[2] + 2 * u * t * mid[2] + t * t * b[2],
+      ]);
+    }
+    return pts;
+  }
+  function netArcs3(net, i) {
+    const ends = net.pins.map(pin3).filter(Boolean);
+    const lift = 26 + (i % 5) * 9;
+    if (ends.length === 2) return [arc3(ends[0], ends[1], lift)];
+    if (ends.length > 2) {
+      const n = ends.length;
+      const hub = [
+        ends.reduce((s, p) => s + p[0], 0) / n,
+        ends.reduce((s, p) => s + p[1], 0) / n,
+        ends.reduce((s, p) => s + p[2], 0) / n + lift,
+      ];
+      return ends.map(e => arc3(e, hub, 8));
+    }
+    return [];
+  }
+
   let pending = null;       // first pin clicked in wire mode
   let pickHandler = null;   // active pin-pick flow (bus/failsafe forms)
   let selNet = -1;
@@ -357,14 +433,27 @@ const WASM_B64 =
     for (let i = nl.nets.length - 1; i >= 0; i--) {
       const net = nl.nets[i];
       if (!layerOn[netClass(net)]) continue;
-      const { segs } = netSegments(net);
-      for (const [a, b] of segs) {
-        let prev = a;
-        for (let k = 1; k <= 12; k++) {
-          const q = bezPoint(a, b, k / 12);
-          const d = distSeg(mx, my, prev[0], prev[1], q[0], q[1]);
-          if (d < 6) return i;
-          prev = q;
+      if (mode === "3d") {
+        for (const arc of netArcs3(net, i)) {
+          let prev = null;
+          for (const p of arc) {
+            const q = project3(p);
+            if (q && prev) {
+              if (distSeg(mx, my, prev[0], prev[1], q[0], q[1]) < 6) return i;
+            }
+            prev = q;
+          }
+        }
+      } else {
+        const { segs } = netSegments(net);
+        for (const [a, b] of segs) {
+          let prev = a;
+          for (let k = 1; k <= 12; k++) {
+            const q = bezPoint(a, b, k / 12);
+            const d = distSeg(mx, my, prev[0], prev[1], q[0], q[1]);
+            if (d < 6) return i;
+            prev = q;
+          }
         }
       }
     }
@@ -492,6 +581,7 @@ const WASM_B64 =
 
   function draw() {
     currentFocus = focusSet();
+    if (mode === "3d") { draw3(); return; }
     cx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
     // grid
@@ -578,6 +668,76 @@ const WASM_B64 =
       selInst ? `${selInst} selected — drag to move, ✕ or Delete to remove` :
       selNet >= 0 ? "net selected — Delete removes it" : "");
   }
+  function stroke3(pts, color, width, dashed, glow) {
+    cx.beginPath();
+    let started = false;
+    for (const p of pts) {
+      const q = project3(p);
+      if (!q) { started = false; continue; }
+      if (!started) { cx.moveTo(q[0], q[1]); started = true; }
+      else cx.lineTo(q[0], q[1]);
+    }
+    cx.strokeStyle = color; cx.lineWidth = width;
+    cx.setLineDash(dashed ? [6, 5] : []);
+    if (glow) { cx.shadowColor = color; cx.shadowBlur = 9; }
+    cx.stroke();
+    cx.shadowBlur = 0; cx.setLineDash([]);
+  }
+  function draw3() {
+    pc = planeCenter();
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
+    // floor grid around the plane centre
+    for (let g = -300; g <= 300; g += 60) {
+      stroke3([[pc[0] + g, pc[1] - 300, 0], [pc[0] + g, pc[1] + 300, 0]], "#151b20", 1, false, false);
+      stroke3([[pc[0] - 300, pc[1] + g, 0], [pc[0] + 300, pc[1] + g, 0]], "#151b20", 1, false, false);
+    }
+    // wires (arcs, lifted — height separation is the point of this view)
+    nl.nets.forEach((net, i) => {
+      const cls = netClass(net);
+      if (!layerOn[cls]) return;
+      const col = COLORS[cls] || "#999";
+      const selW = i === selNet;
+      for (const arc of netArcs3(net, i)) stroke3(arc, col, selW ? 3 : 1.8, false, true);
+    });
+    for (const bus of (layerOn.i2c ? nl.buses : [])) {
+      const m = pin3(bus.sda);
+      if (!m) continue;
+      for (const dev of bus.devices) {
+        const d = pin3(dev.inst + ".SDA");
+        if (d) stroke3(arc3(m, d, 44), COLORS.i2c, 1.8, true, true);
+      }
+    }
+    // boxes
+    for (const inst of Object.keys(nl.instances)) {
+      if (!instVisible(inst)) continue;
+      const g = geo3(inst);
+      const isSel = inst === selInst;
+      const col = isSel || (pending && splitPin(pending)[0] === inst) ? "#e8a33d" : "#5b6a73";
+      const c = [];
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [0, 1])
+        c.push([g.x + sx * g.W / 2, g.y + sy * g.D / 2, sz * g.h]);
+      const edges = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+      for (const [a, b] of edges) stroke3([c[a], c[b]], col, isSel ? 2 : 1.2, false, false);
+      const q = project3([g.x, g.y, g.h + 10]);
+      if (q) {
+        cx.fillStyle = isSel ? "#e8a33d" : "#c7ced2";
+        cx.font = "11px ui-monospace, Menlo, monospace";
+        cx.fillText(inst, q[0] - 12, q[1]);
+      }
+      for (const [pin, pp] of Object.entries(g.pinPos3)) {
+        const ep = inst + "." + pin;
+        const q2 = project3(pp);
+        if (!q2) continue;
+        const active = pending === ep;
+        cx.fillStyle = active ? "#e8a33d" : "#aab4ba";
+        cx.beginPath(); cx.arc(q2[0], q2[1], active ? 5 : 3, 0, Math.PI * 2); cx.fill();
+      }
+    }
+    hint(pending ? `wiring from ${pending} — click another pin (esc cancels)` :
+      pickHandler ? "pick a pin…" :
+      "3D — drag empty space to orbit, wheel to zoom; switch to 2D to rearrange");
+  }
   function roundRect(x, y, w, h, r) {
     cx.beginPath();
     cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r);
@@ -589,9 +749,17 @@ const WASM_B64 =
   function pinAt(mx, my) {
     for (const inst of Object.keys(nl.instances)) {
       if (!instVisible(inst)) continue;
-      const g = boxGeo(inst);
-      for (const [pin, [px, py]] of Object.entries(g.pinPos)) {
-        if (Math.hypot(mx - px, my - py) < 8) return inst + "." + pin;
+      if (mode === "3d") {
+        const g = geo3(inst);
+        for (const [pin, pp] of Object.entries(g.pinPos3)) {
+          const q = project3(pp);
+          if (q && Math.hypot(mx - q[0], my - q[1]) < 8) return inst + "." + pin;
+        }
+      } else {
+        const g = boxGeo(inst);
+        for (const [pin, [px, py]] of Object.entries(g.pinPos)) {
+          if (Math.hypot(mx - px, my - py) < 8) return inst + "." + pin;
+        }
       }
     }
     return null;
@@ -599,8 +767,14 @@ const WASM_B64 =
   function instAt(mx, my) {
     for (const inst of Object.keys(nl.instances).reverse()) {
       if (!instVisible(inst)) continue;
-      const g = boxGeo(inst);
-      if (Math.abs(mx - g.x) < BOXW / 2 && Math.abs(my - g.y) < g.h / 2) return inst;
+      if (mode === "3d") {
+        const g = geo3(inst);
+        const q = project3([g.x, g.y, g.h / 2]);
+        if (q && Math.hypot(mx - q[0], my - q[1]) < 34) return inst;
+      } else {
+        const g = boxGeo(inst);
+        if (Math.abs(mx - g.x) < BOXW / 2 && Math.abs(my - g.y) < g.h / 2) return inst;
+      }
     }
     return null;
   }
@@ -625,8 +799,8 @@ const WASM_B64 =
       } else pending = null;
       draw(); return;
     }
-    // removal badge on the selected box?
-    if (selInst && layout[selInst]) {
+    // removal badge on the selected box? (2D only; Delete works everywhere)
+    if (mode === "2d" && selInst && layout[selInst]) {
       const g = boxGeo(selInst);
       if (Math.hypot(mx - (g.x + BOXW / 2 - 2), my - (g.y - g.h / 2 + 2)) < 10) {
         removeInstance(selInst);
@@ -644,16 +818,32 @@ const WASM_B64 =
     const inst = instAt(mx, my);
     if (inst) {
       selInst = inst; selNet = -1;
-      dragInst = inst; dragMoved = false;
-      dragOff = [mx - layout[inst][0], my - layout[inst][1]];
-      cv.setPointerCapture(e.pointerId);
+      if (mode === "2d") {
+        dragInst = inst; dragMoved = false;
+        dragOff = [mx - layout[inst][0], my - layout[inst][1]];
+        cv.setPointerCapture(e.pointerId);
+      }
       renderNets(); renderSelInfo(); draw();
+      return;
+    }
+    if (mode === "3d") {
+      orbiting = true;
+      lastXY = [mx, my];
+      cv.classList.add("dragging");
+      cv.setPointerCapture(e.pointerId);
       return;
     }
     pending = null; selInst = null; selNet = -1;
     renderNets(); renderSelInfo(); draw();
   });
   cv.addEventListener("pointermove", e => {
+    if (orbiting) {
+      yaw += (e.offsetX - lastXY[0]) * 0.008;
+      pitch = Math.max(0.05, Math.min(1.45, pitch + (e.offsetY - lastXY[1]) * 0.006));
+      lastXY = [e.offsetX, e.offsetY];
+      draw();
+      return;
+    }
     if (dragInst) {
       dragMoved = true;
       layout[dragInst] = [e.offsetX - dragOff[0], e.offsetY - dragOff[1]];
@@ -666,7 +856,23 @@ const WASM_B64 =
       : wireAt(mx, my) >= 0 ? "pointer"
       : instAt(mx, my) ? "move" : "default";
   });
-  cv.addEventListener("pointerup", () => { if (dragInst) { dragInst = null; saveLayout(); } });
+  cv.addEventListener("pointerup", () => {
+    if (dragInst) { dragInst = null; saveLayout(); }
+    if (orbiting) { orbiting = false; cv.classList.remove("dragging"); }
+  });
+  let lastXY = [0, 0];
+  cv.addEventListener("wheel", e => {
+    if (mode !== "3d") return;
+    e.preventDefault();
+    dist = Math.max(250, Math.min(2600, dist * (1 + e.deltaY * 0.001)));
+    draw();
+  }, { passive: false });
+  document.getElementById("modeBtn").addEventListener("click", () => {
+    mode = mode === "2d" ? "3d" : "2d";
+    document.getElementById("modeBtn").textContent = mode === "2d" ? "3D view" : "2D view";
+    pending = null;
+    draw();
+  });
   cv.addEventListener("dragover", e => {
     if (e.dataTransfer.types.includes("text/robowire-part")) {
       e.preventDefault();
