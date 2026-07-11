@@ -416,6 +416,14 @@ pub fn e40_power_switch(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult
 pub fn e41_failsafe_chain(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult, String> {
     const C: &str = "E41";
     const D: &str = "failsafe stop chain declared and complete";
+    // The stop chain is a robot-control requirement: without a radio link
+    // there is nothing to lose signal from (battery-and-bulb circuits).
+    let has_radio = nl.instances.values().any(|pid| {
+        cat.get(pid).map_or(false, |(p, _)| p.kind == "radio")
+    });
+    if !has_radio {
+        return Ok(ok(C, D, "no radio link — stop chain not applicable".into()));
+    }
     let Some(fs) = &nl.failsafe else {
         return Ok(fail(C, D, "no failsafe declaration".into()));
     };

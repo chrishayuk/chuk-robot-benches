@@ -1,0 +1,18 @@
+{
+  "name": "example-led-from-brain",
+  "instances": {
+    "batt": "lipo-2s-260", "sw": "power-switch-slide", "reg": "reg-5v-mini",
+    "mcu": "rp2350-zero", "r1": "resistor-330r", "led1": "led-red-5mm", "btn": "tact-button"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
+    { "id": "vbat", "pins": ["sw.out", "reg.VIN"], "volts": 7.4 },
+    { "id": "v5", "pins": ["reg.OUT", "mcu.5V"], "volts": 5.0 },
+    { "id": "v33", "pins": ["mcu.3V3", "r1.P1"], "volts": 3.3 },
+    { "id": "led_feed", "pins": ["r1.P2", "led1.A"] },
+    { "id": "btn_in", "pins": ["mcu.GP6", "btn.A"] },
+    { "id": "gnd", "pins": ["batt.-", "reg.GND", "mcu.GND", "led1.K", "btn.B"] }
+  ],
+  "buses": [],
+  "failsafe": null
+}

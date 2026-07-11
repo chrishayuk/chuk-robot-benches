@@ -1,0 +1,15 @@
+{
+  "id": "reg-5v-mini",
+  "kind": "regulator",
+  "mass_g": 1.0,
+  "provisional": true,
+  "notes": "mini buck/linear 5V regulator, ~0.8A",
+  "description": "A small 5-volt regulator: feed it raw battery voltage and it puts out a clean 5V — the safe way to power the brain when there's no ESC with a built-in BEC around.",
+  "elec": {
+    "pins": {
+      "VIN": { "role": "power_in", "v_range": [6.5, 9.0], "required": true },
+      "GND": { "role": "gnd", "required": true },
+      "OUT": { "role": "power_out", "volts": 5.0, "max_a": 0.8 }
+    }
+  }
+}

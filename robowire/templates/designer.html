@@ -99,12 +99,15 @@
   <input id="nlname" title="netlist name">
   <span class="spacer"></span>
   <button id="modeBtn">3D view</button>
+  <button id="arrangeBtn">auto-arrange</button>
   <button id="importBtn">import</button>
   <button id="exportBtn" class="primary">export netlist</button>
 </header>
 <div id="left">
   <h2>layers</h2>
   <div id="layerToggles"></div>
+  <h2>examples — click to load</h2>
+  <div id="examples"></div>
   <h2>parts catalogue — drag onto the board</h2>
   <input id="partFilter" placeholder="filter parts…" style="width:100%;margin-bottom:6px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:11px ui-monospace,Menlo,monospace">
   <div id="palette"></div>
@@ -140,6 +143,9 @@ const PARTS =
 const START_NETLIST =
 //__NETLIST__
 null;
+const EXAMPLES =
+//__EXAMPLES__
+[];
 const WASM_B64 =
 //__WASM__
 "";
@@ -212,16 +218,24 @@ const WASM_B64 =
   function boxGeo(inst) {
     const pins = pinsOf(inst);
     const rows = Math.ceil(pins.length / 2);
-    const h = 34 + Math.max(rows, 1) * 15;
-    if (!layout[inst]) layout[inst] = [80 + Object.keys(layout).length * 40, 80 + Object.keys(layout).length * 30];
-    const [x, y] = layout[inst];
+    const bh = 34 + Math.max(rows, 1) * 15; // upright height
+    if (!layout[inst]) layout[inst] = [80 + Object.keys(layout).length * 40, 80 + Object.keys(layout).length * 30, 0];
+    const L = layout[inst];
+    const [x, y] = L;
+    const rot = ((L[2] || 0) % 360 + 360) % 360;
+    const rad = rot * Math.PI / 180;
+    const cr = Math.cos(rad), sr = Math.sin(rad);
     const pinPos = {};
     pins.forEach((p, i) => {
       const side = i % 2 === 0 ? -1 : 1;
       const row = Math.floor(i / 2);
-      pinPos[p] = [x + side * BOXW / 2, y - h / 2 + 40 + row * 15, side];
+      const rx = side * BOXW / 2, ry = -bh / 2 + 40 + row * 15;
+      const ox = side * cr, oy = side * sr;
+      pinPos[p] = [x + rx * cr - ry * sr, y + rx * sr + ry * cr, ox, oy];
     });
-    return { x, y, h, pinPos };
+    const w = rot % 180 === 0 ? BOXW : bh;
+    const h = rot % 180 === 0 ? bh : BOXW;
+    return { x, y, w, h, rot, pinPos };
   }
   function pinXY(ep) {
     const [inst, pin] = splitPin(ep);
@@ -291,9 +305,10 @@ const WASM_B64 =
     }
     return pts;
   }
+  const CLASS_LIFT = { gnd: 12, vbat: 24, v5: 36, v33: 48, motor: 30, pwm: 62, uart: 72, sig: 66, i2c: 84 };
   function netArcs3(net, i) {
     const ends = net.pins.map(pin3).filter(Boolean);
-    const lift = 26 + (i % 5) * 9;
+    const lift = (CLASS_LIFT[netClass(net)] || 40) + (i % 3) * 4;
     if (ends.length === 2) return [arc3(ends[0], ends[1], lift)];
     if (ends.length > 2) {
       const n = ends.length;
@@ -650,33 +665,33 @@ const WASM_B64 =
       const isSel = inst === selInst;
       cx.strokeStyle = isSel || (pending && splitPin(pending)[0] === inst) ? "#e8a33d" : "#4a575f";
       cx.lineWidth = isSel ? 2.2 : 1.4;
-      roundRect(g.x - BOXW / 2, g.y - g.h / 2, BOXW, g.h, 6);
+      roundRect(g.x - g.w / 2, g.y - g.h / 2, g.w, g.h, 6);
       cx.fill(); cx.stroke();
       cx.fillStyle = "#e6e9e4";
       cx.font = "bold 11px ui-monospace, Menlo, monospace";
-      cx.fillText(inst, g.x - BOXW / 2 + 8, g.y - g.h / 2 + 15);
+      cx.fillText(inst, g.x - g.w / 2 + 8, g.y - g.h / 2 + 15);
       cx.fillStyle = "#7d8b93";
       cx.font = "9px ui-monospace, Menlo, monospace";
-      cx.fillText(nl.instances[inst], g.x - BOXW / 2 + 8, g.y - g.h / 2 + 27);
+      cx.fillText(nl.instances[inst], g.x - g.w / 2 + 8, g.y - g.h / 2 + 27);
       if (isSel) {
         // removal badge, top-right of the selected box
         cx.fillStyle = "#e05c50";
-        cx.beginPath(); cx.arc(g.x + BOXW / 2 - 2, g.y - g.h / 2 + 2, 8, 0, Math.PI * 2); cx.fill();
+        cx.beginPath(); cx.arc(g.x + g.w / 2 - 2, g.y - g.h / 2 + 2, 8, 0, Math.PI * 2); cx.fill();
         cx.fillStyle = "#0d1114";
         cx.font = "bold 11px ui-monospace, Menlo, monospace";
         cx.textAlign = "center";
-        cx.fillText("✕", g.x + BOXW / 2 - 2, g.y - g.h / 2 + 6);
+        cx.fillText("✕", g.x + g.w / 2 - 2, g.y - g.h / 2 + 6);
         cx.textAlign = "left";
       }
-      for (const [pin, [px, py, side]] of Object.entries(g.pinPos)) {
+      for (const [pin, [px, py, ox, oy]] of Object.entries(g.pinPos)) {
         const ep = inst + "." + pin;
         const active = pending === ep;
         cx.fillStyle = active ? "#e8a33d" : "#aab4ba";
         cx.beginPath(); cx.arc(px, py, active ? 5 : 3.4, 0, Math.PI * 2); cx.fill();
         cx.fillStyle = "#8b969b";
         cx.font = "8.5px ui-monospace, Menlo, monospace";
-        cx.textAlign = side < 0 ? "right" : "left";
-        cx.fillText(pin, px + side * 8, py + 3);
+        cx.textAlign = ox < -0.3 ? "right" : ox > 0.3 ? "left" : "center";
+        cx.fillText(pin, px + ox * 9, py + oy * 9 + 3);
         cx.textAlign = "left";
       }
     }
@@ -692,7 +707,7 @@ const WASM_B64 =
     hint(wireDrag && wireDrag.moved ? `release on a pin to connect ${wireDrag.from}` :
       pending ? `wiring from ${pending} — click another pin, or drag from a pin (esc cancels)` :
       pickHandler ? "pick a pin…" :
-      selInst ? `${selInst} selected — drag to move, ✕ or Delete to remove` :
+      selInst ? `${selInst} selected — drag to move, R rotates, ✕ or Delete removes` :
       selNet >= 0 ? "net selected — Delete removes it" : "");
   }
   function stroke3(pts, color, width, dashed, glow) {
@@ -732,7 +747,7 @@ const WASM_B64 =
       if (!m) continue;
       for (const dev of bus.devices) {
         const d = pin3(dev.inst + ".SDA");
-        if (d) stroke3(arc3(m, d, 44), COLORS.i2c, 1.8, true, true);
+        if (d) stroke3(arc3(m, d, CLASS_LIFT.i2c), COLORS.i2c, 1.8, true, true);
       }
     }
     // boxes
@@ -810,7 +825,7 @@ const WASM_B64 =
         if (q && Math.hypot(mx - q[0], my - q[1]) < 34) return inst;
       } else {
         const g = boxGeo(inst);
-        if (Math.abs(mx - g.x) < BOXW / 2 && Math.abs(my - g.y) < g.h / 2) return inst;
+        if (Math.abs(mx - g.x) < g.w / 2 && Math.abs(my - g.y) < g.h / 2) return inst;
       }
     }
     return null;
@@ -830,7 +845,7 @@ const WASM_B64 =
     // removal badge on the selected box? (2D only; Delete works everywhere)
     if (mode === "2d" && selInst && layout[selInst]) {
       const g = boxGeo(selInst);
-      if (Math.hypot(mx - (g.x + BOXW / 2 - 2), my - (g.y - g.h / 2 + 2)) < 10) {
+      if (Math.hypot(mx - (g.x + g.w / 2 - 2), my - (g.y - g.h / 2 + 2)) < 10) {
         removeInstance(selInst);
         refresh(); return;
       }
@@ -920,6 +935,43 @@ const WASM_B64 =
     dist = Math.max(250, Math.min(2600, dist * (1 + e.deltaY * 0.001)));
     draw();
   }, { passive: false });
+  const ARRANGE_ROWS = [
+    ["battery", "switch", "regulator"],
+    ["esc", "motor"],
+    ["mcu"],
+    ["tof", "imu", "radio"],
+    ["led", "resistor", "buzzer", "button"],
+  ];
+  function autoArrange() {
+    const insts = Object.keys(nl.instances);
+    const rowOf = inst => {
+      const k = kindOf(inst);
+      const idx = ARRANGE_ROWS.findIndex(r => r.includes(k));
+      return idx >= 0 ? idx : ARRANGE_ROWS.length;
+    };
+    const byRow = new Map();
+    for (const inst of insts.sort()) {
+      const r = rowOf(inst);
+      if (!byRow.has(r)) byRow.set(r, []);
+      byRow.get(r).push(inst);
+    }
+    const rows = [...byRow.keys()].sort((a, b) => a - b);
+    const cw = cv.clientWidth || 900;
+    rows.forEach((r, ri) => {
+      const members = byRow.get(r);
+      members.forEach((inst, ci) => {
+        const rot = (layout[inst] && layout[inst][2]) || 0;
+        layout[inst] = [
+          cw / 2 + (ci - (members.length - 1) / 2) * 185,
+          95 + ri * 150,
+          rot,
+        ];
+      });
+    });
+    saveLayout();
+    draw();
+  }
+  document.getElementById("arrangeBtn").addEventListener("click", autoArrange);
   document.getElementById("modeBtn").addEventListener("click", () => {
     mode = mode === "2d" ? "3d" : "2d";
     document.getElementById("modeBtn").textContent = mode === "2d" ? "3D view" : "2D view";
@@ -943,6 +995,13 @@ const WASM_B64 =
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
     if (e.key === "Escape") { pending = null; pickHandler = null; wireDrag = null; selInst = null; selNet = -1; renderNets(); renderSelInfo(); draw(); hint(""); }
+    if ((e.key === "r" || e.key === "R") && selInst && mode === "2d") {
+      const L = layout[selInst];
+      L[2] = ((L[2] || 0) + 90) % 360;
+      saveLayout();
+      draw();
+      return;
+    }
     if ((e.key === "Delete" || e.key === "Backspace")) {
       if (selNet >= 0) { nl.nets.splice(selNet, 1); selNet = -1; refresh(); }
       else if (selInst) { removeInstance(selInst); refresh(); }
@@ -1017,6 +1076,33 @@ const WASM_B64 =
     }
   }
   document.getElementById("partFilter").addEventListener("input", renderPalette);
+
+  function renderExamples() {
+    const el = document.getElementById("examples");
+    el.innerHTML = "";
+    for (const ex of EXAMPLES) {
+      const div = document.createElement("div");
+      div.className = "part";
+      const lesson = ex.name.startsWith("lesson-");
+      div.innerHTML = `<span>${ex.name.replace(/^(example|lesson)-/, "")}` +
+        `<br><span class="k">${lesson ? "lesson — deliberately broken, read the checks" : "worked example"}</span></span>`;
+      const btn = document.createElement("button");
+      btn.className = "mini";
+      btn.textContent = "load";
+      btn.addEventListener("click", () => {
+        if (Object.keys(nl.instances).length && !confirm("Replace the current design with '" + ex.name + "'?")) return;
+        nl = JSON.parse(JSON.stringify(ex));
+        if (!nl.failsafe) nl.failsafe = { rx_loss: "", stop_pins: [] };
+        if (!nl.buses) nl.buses = [];
+        layout = {};
+        selInst = null; selNet = -1; pending = null;
+        refresh();
+        autoArrange();
+      });
+      div.appendChild(btn);
+      el.appendChild(div);
+    }
+  }
 
   function renderNets() {
     const el = document.getElementById("nets");
@@ -1209,6 +1295,7 @@ const WASM_B64 =
   function refresh() {
     nameEl.value = nl.name;
     renderLayers();
+    renderExamples();
     renderPalette();
     renderNets();
     renderBuses();

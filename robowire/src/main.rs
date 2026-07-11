@@ -117,8 +117,28 @@ fn cmd_design(args: &[String]) {
         out
     };
 
+    // Examples library (harness/examples/*.json), embedded for the sidebar.
+    let examples_dir = PathBuf::from(flag("--examples").unwrap_or_else(|| "harness/examples".into()));
+    let mut examples = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&examples_dir) {
+        let mut ex_paths: Vec<_> = rd
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().map_or(false, |x| x == "json"))
+            .collect();
+        ex_paths.sort();
+        for path in ex_paths {
+            if let Ok(v) = serde_json::from_slice::<serde_json::Value>(
+                &std::fs::read(&path).unwrap_or_default(),
+            ) {
+                examples.push(v);
+            }
+        }
+    }
+    let examples_json = serde_json::to_string(&examples).unwrap();
+
     let template = include_str!("../templates/designer.html");
     let html = template
+        .replace("//__EXAMPLES__\n[];", &format!("{examples_json};"))
         .replace("//__PARTS__\n[];", &format!("{parts_json};"))
         .replace("//__NETLIST__\nnull;", &format!("{netlist_json};"))
         .replace("//__WASM__\n\"\";", &format!("\"{b64}\";"));

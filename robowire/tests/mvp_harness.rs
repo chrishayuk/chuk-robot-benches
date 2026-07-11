@@ -150,3 +150,39 @@ fn planted_bare_led_fails_e33() {
     });
     assert!(code_result(&nl, &cat, "E33"), "resistor in series must satisfy E33");
 }
+
+#[test]
+fn examples_are_legal_and_lessons_fail_their_named_code() {
+    let root = repo_root();
+    let cat = ElecCatalogue::load(&root.join("parts")).unwrap();
+    let dir = root.join("harness/examples");
+    let mut count = 0;
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().map_or(true, |x| x != "json") {
+            continue;
+        }
+        count += 1;
+        let name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let nl: Netlist =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let checks = run_checks(&nl, &cat).unwrap();
+        if let Some(code) = name
+            .strip_prefix("lesson-")
+            .and_then(|r| r.split('-').next())
+        {
+            let code = code.to_uppercase();
+            let c = checks.iter().find(|c| c.code == code).unwrap();
+            assert!(!c.pass, "{name}: expected {code} to FAIL (it's the lesson)");
+            assert!(
+                checks.iter().filter(|c| !c.pass).all(|c| c.code == code),
+                "{name}: only {code} may fail, got {:?}",
+                checks.iter().filter(|c| !c.pass).map(|c| &c.code).collect::<Vec<_>>()
+            );
+        } else {
+            let fails: Vec<_> = checks.iter().filter(|c| !c.pass).collect();
+            assert!(fails.is_empty(), "{name}: {fails:?}");
+        }
+    }
+    assert!(count >= 3, "expected at least 3 examples, found {count}");
+}
