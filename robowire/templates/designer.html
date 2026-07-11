@@ -127,6 +127,7 @@
   <div id="fspins" style="margin-top:4px"></div>
 </div>
 <div id="hint"></div>
+<div id="dbg" style="position:fixed;bottom:10px;right:14px;color:var(--dim);font:10px ui-monospace,Menlo,monospace;background:color-mix(in srgb, var(--panel) 85%, transparent);padding:3px 8px;border-radius:4px">build __BUILD__</div>
 <dialog id="ioDialog">
   <h2 id="ioTitle">netlist json</h2>
   <textarea id="ioText"></textarea>
@@ -206,11 +207,18 @@ const WASM_B64 =
   const cv = document.getElementById("board");
   const cx = cv.getContext("2d");
   let dpr = 1;
-  function resize() {
+  function syncCanvas() {
     dpr = window.devicePixelRatio || 1;
-    cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
-    draw();
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return false;
+    const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+    if (cv.width !== bw) cv.width = bw;
+    if (cv.height !== bh) cv.height = bh;
+    document.getElementById("dbg").textContent =
+      `build __BUILD__ · dpr ${dpr} · css ${w}x${h} · backing ${cv.width}x${cv.height}`;
+    return true;
   }
+  function resize() { if (syncCanvas()) draw(); }
   const BOXW = 128;
   function pinsOf(inst) {
     const part = partById[nl.instances[inst]];
@@ -687,11 +695,7 @@ const WASM_B64 =
 
   function draw() {
     currentFocus = focusSet();
-    // Self-healing: never paint at a stale backing size (kills the
-    // zoomed-looking first frame regardless of layout timing).
-    dpr = window.devicePixelRatio || 1;
-    const bw = Math.round(cv.clientWidth * dpr), bh2 = Math.round(cv.clientHeight * dpr);
-    if (cv.width !== bw || cv.height !== bh2) { cv.width = bw; cv.height = bh2; }
+    if (!syncCanvas()) { requestAnimationFrame(draw); return; }
     if (mode === "3d") { draw3(); return; }
     cx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
@@ -1348,6 +1352,9 @@ const WASM_B64 =
     runChecksSoon();
   }
   window.addEventListener("resize", resize);
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(() => resize()).observe(cv);
+  }
   resize();
   refresh();
   // First-ever load (no saved layout): arrange instead of the overlap

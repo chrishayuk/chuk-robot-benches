@@ -137,7 +137,18 @@ fn cmd_design(args: &[String]) {
     let examples_json = serde_json::to_string(&examples).unwrap();
 
     let template = include_str!("../templates/designer.html");
+    // Deterministic build id: template + wasm content hash, so a screenshot
+    // always identifies exactly which build rendered it.
+    let build_id = {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(template.as_bytes());
+        h.update(&wasm);
+        let d = h.finalize();
+        format!("{:02x}{:02x}{:02x}{:02x}", d[0], d[1], d[2], d[3])
+    };
     let html = template
+        .replace("__BUILD__", &build_id)
         .replace("//__EXAMPLES__\n[];", &format!("{examples_json};"))
         .replace("//__PARTS__\n[];", &format!("{parts_json};"))
         .replace("//__NETLIST__\nnull;", &format!("{netlist_json};"))
