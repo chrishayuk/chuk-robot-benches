@@ -94,6 +94,8 @@
   <button id="exportBtn" class="primary">export netlist</button>
 </header>
 <div id="left">
+  <h2>layers</h2>
+  <div id="layerToggles"></div>
   <h2>parts catalogue — click to place</h2>
   <div id="palette"></div>
 </div>
@@ -217,7 +219,86 @@ const WASM_B64 =
   let pending = null;       // first pin clicked in wire mode
   let pickHandler = null;   // active pin-pick flow (bus/failsafe forms)
   let selNet = -1;
-  let dragInst = null, dragOff = [0, 0];
+  let selInst = null;
+  let dragInst = null, dragOff = [0, 0], dragMoved = false;
+  const LAYER_LABELS = {
+    vbat: "battery power", v5: "5V supply", v33: "3.3V supply", gnd: "ground",
+    motor: "motor power", pwm: "drive commands", uart: "radio link", i2c: "sensor bus", sig: "other signals",
+  };
+  const layerOn = {};
+  for (const k of Object.keys(LAYER_LABELS)) layerOn[k] = true;
+  function renderLayers() {
+    const el = document.getElementById("layerToggles");
+    el.innerHTML = "";
+    for (const [k, label] of Object.entries(LAYER_LABELS)) {
+      const lab = document.createElement("label");
+      lab.className = "ck";
+      const inp = document.createElement("input");
+      inp.type = "checkbox"; inp.checked = layerOn[k];
+      inp.addEventListener("change", () => { layerOn[k] = inp.checked; draw(); });
+      const sw = document.createElement("span");
+      sw.style.cssText = "width:14px;height:3px;border-radius:2px;display:inline-block;background:" + (COLORS[k] || "#999");
+      lab.append(inp, sw, document.createTextNode(label));
+      el.appendChild(lab);
+    }
+  }
+
+  // Shared wire geometry so drawing and hit-testing can't disagree.
+  function netSegments(net) {
+    const pts = net.pins.map(pinXY).filter(Boolean);
+    if (pts.length < 2) return { segs: [], hub: null };
+    if (pts.length === 2) return { segs: [[pts[0], pts[1]]], hub: null };
+    const hub = [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+    return { segs: pts.map(p => [p, hub]), hub };
+  }
+  function bezPoint(a, b, t) {
+    const mx = (a[0] + b[0]) / 2;
+    const u = 1 - t;
+    // cubic with P1=(mx, ay), P2=(mx, by) — matches the draw call.
+    const x = u*u*u*a[0] + 3*u*u*t*mx + 3*u*t*t*mx + t*t*t*b[0];
+    const y = u*u*u*a[1] + 3*u*u*t*a[1] + 3*u*t*t*b[1] + t*t*t*b[1];
+    return [x, y];
+  }
+  function wireAt(mx, my) {
+    for (let i = nl.nets.length - 1; i >= 0; i--) {
+      const net = nl.nets[i];
+      if (!layerOn[netClass(net)]) continue;
+      const { segs } = netSegments(net);
+      for (const [a, b] of segs) {
+        let prev = a;
+        for (let k = 1; k <= 12; k++) {
+          const q = bezPoint(a, b, k / 12);
+          const d = distSeg(mx, my, prev[0], prev[1], q[0], q[1]);
+          if (d < 6) return i;
+          prev = q;
+        }
+      }
+    }
+    return -1;
+  }
+  function distSeg(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2)) : 0;
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+  function removeInstance(inst) {
+    delete nl.instances[inst];
+    delete layout[inst];
+    const prefix = inst + ".";
+    for (const net of nl.nets) net.pins = net.pins.filter(p => !p.startsWith(prefix));
+    nl.nets = nl.nets.filter(n => n.pins.length >= 2);
+    for (const bus of nl.buses) {
+      bus.devices = bus.devices.filter(d => d.inst !== inst);
+      for (const dev of bus.devices) if (dev.xshut && dev.xshut.startsWith(prefix)) delete dev.xshut;
+      if (bus.sda.startsWith(prefix)) bus.sda = "";
+      if (bus.scl.startsWith(prefix)) bus.scl = "";
+    }
+    nl.buses = nl.buses.filter(b => b.sda && b.scl || b.devices.length);
+    nl.failsafe.stop_pins = nl.failsafe.stop_pins.filter(p => !p.startsWith(prefix));
+    selInst = null; selNet = -1;
+    saveLayout();
+  }
 
   function draw() {
     cx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -229,17 +310,14 @@ const WASM_B64 =
 
     // wires
     nl.nets.forEach((net, i) => {
-      const col = COLORS[netClass(net)] || "#999";
-      const pts = net.pins.map(pinXY).filter(Boolean);
-      if (pts.length < 2) return;
-      const hub = pts.length > 2
-        ? [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length]
-        : null;
+      const cls = netClass(net);
+      if (!layerOn[cls]) return;
+      const col = COLORS[cls] || "#999";
+      const { segs, hub } = netSegments(net);
       cx.strokeStyle = col;
       cx.lineWidth = i === selNet ? 3 : 1.8;
       cx.shadowColor = col; cx.shadowBlur = i === selNet ? 12 : 5;
-      const targets = hub ? pts.map(p => [p, hub]) : [[pts[0], pts[1]]];
-      for (const [a, b] of targets) {
+      for (const [a, b] of segs) {
         cx.beginPath();
         cx.moveTo(a[0], a[1]);
         const mx = (a[0] + b[0]) / 2;
@@ -250,7 +328,7 @@ const WASM_B64 =
       if (hub) { cx.fillStyle = col; cx.beginPath(); cx.arc(hub[0], hub[1], 3.4, 0, Math.PI * 2); cx.fill(); }
     });
     // bus wires
-    for (const bus of nl.buses) {
+    for (const bus of (layerOn.i2c ? nl.buses : [])) {
       const m = pinXY(bus.sda);
       if (!m) continue;
       for (const dev of bus.devices) {
@@ -269,8 +347,9 @@ const WASM_B64 =
     for (const inst of Object.keys(nl.instances)) {
       const g = boxGeo(inst);
       cx.fillStyle = "#1a2126";
-      cx.strokeStyle = pending && splitPin(pending)[0] === inst ? "#e8a33d" : "#4a575f";
-      cx.lineWidth = 1.4;
+      const isSel = inst === selInst;
+      cx.strokeStyle = isSel || (pending && splitPin(pending)[0] === inst) ? "#e8a33d" : "#4a575f";
+      cx.lineWidth = isSel ? 2.2 : 1.4;
       roundRect(g.x - BOXW / 2, g.y - g.h / 2, BOXW, g.h, 6);
       cx.fill(); cx.stroke();
       cx.fillStyle = "#e6e9e4";
@@ -279,6 +358,16 @@ const WASM_B64 =
       cx.fillStyle = "#7d8b93";
       cx.font = "9px ui-monospace, Menlo, monospace";
       cx.fillText(nl.instances[inst], g.x - BOXW / 2 + 8, g.y - g.h / 2 + 27);
+      if (isSel) {
+        // removal badge, top-right of the selected box
+        cx.fillStyle = "#e05c50";
+        cx.beginPath(); cx.arc(g.x + BOXW / 2 - 2, g.y - g.h / 2 + 2, 8, 0, Math.PI * 2); cx.fill();
+        cx.fillStyle = "#0d1114";
+        cx.font = "bold 11px ui-monospace, Menlo, monospace";
+        cx.textAlign = "center";
+        cx.fillText("✕", g.x + BOXW / 2 - 2, g.y - g.h / 2 + 6);
+        cx.textAlign = "left";
+      }
       for (const [pin, [px, py, side]] of Object.entries(g.pinPos)) {
         const ep = inst + "." + pin;
         const active = pending === ep;
@@ -293,7 +382,9 @@ const WASM_B64 =
     }
     // pending wire rubber band hint
     hint(pending ? `wiring from ${pending} — click another pin (esc cancels)` :
-      pickHandler ? "pick a pin…" : "");
+      pickHandler ? "pick a pin…" :
+      selInst ? `${selInst} selected — drag to move, ✕ or Delete to remove` :
+      selNet >= 0 ? "net selected — Delete removes it" : "");
   }
   function roundRect(x, y, w, h, r) {
     cx.beginPath();
@@ -340,24 +431,57 @@ const WASM_B64 =
       } else pending = null;
       draw(); return;
     }
-    const inst = instAt(mx, my);
-    if (inst) {
-      dragInst = inst;
-      dragOff = [mx - layout[inst][0], my - layout[inst][1]];
-      cv.setPointerCapture(e.pointerId);
+    // removal badge on the selected box?
+    if (selInst && layout[selInst]) {
+      const g = boxGeo(selInst);
+      if (Math.hypot(mx - (g.x + BOXW / 2 - 2), my - (g.y - g.h / 2 + 2)) < 10) {
+        removeInstance(selInst);
+        refresh(); return;
+      }
+    }
+    const wi = wireAt(mx, my);
+    if (wi >= 0) {
+      selNet = wi; selInst = null;
+      renderNets(); draw();
+      const row = document.querySelectorAll("#nets .row")[wi];
+      if (row) row.scrollIntoView({ block: "nearest" });
       return;
     }
-    pending = null; draw();
+    const inst = instAt(mx, my);
+    if (inst) {
+      selInst = inst; selNet = -1;
+      dragInst = inst; dragMoved = false;
+      dragOff = [mx - layout[inst][0], my - layout[inst][1]];
+      cv.setPointerCapture(e.pointerId);
+      renderNets(); draw();
+      return;
+    }
+    pending = null; selInst = null; selNet = -1;
+    renderNets(); draw();
   });
   cv.addEventListener("pointermove", e => {
     if (dragInst) {
+      dragMoved = true;
       layout[dragInst] = [e.offsetX - dragOff[0], e.offsetY - dragOff[1]];
       draw();
+      return;
     }
+    // cursor feedback
+    const mx = e.offsetX, my = e.offsetY;
+    cv.style.cursor = pinAt(mx, my) ? "crosshair"
+      : wireAt(mx, my) >= 0 ? "pointer"
+      : instAt(mx, my) ? "move" : "default";
   });
   cv.addEventListener("pointerup", () => { if (dragInst) { dragInst = null; saveLayout(); } });
   window.addEventListener("keydown", e => {
-    if (e.key === "Escape") { pending = null; pickHandler = null; draw(); hint(""); }
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (e.key === "Escape") { pending = null; pickHandler = null; selInst = null; selNet = -1; renderNets(); draw(); hint(""); }
+    if ((e.key === "Delete" || e.key === "Backspace")) {
+      if (selNet >= 0) { nl.nets.splice(selNet, 1); selNet = -1; refresh(); }
+      else if (selInst) { removeInstance(selInst); refresh(); }
+      e.preventDefault();
+    }
   });
   function autoNetId(a, b) {
     const base = (splitPin(a)[1] + "_" + splitPin(b)[0]).toLowerCase().replace(/[^a-z0-9]+/g, "_");
@@ -582,6 +706,7 @@ const WASM_B64 =
   // ---- refresh --------------------------------------------------------------------
   function refresh() {
     nameEl.value = nl.name;
+    renderLayers();
     renderPalette();
     renderNets();
     renderBuses();
