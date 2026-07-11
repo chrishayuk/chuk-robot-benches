@@ -6,8 +6,15 @@
   "notes": "main-path switch (tech-check E40)",
   "elec": {
     "pins": {
-      "in": { "role": "switch_in", "required": true },
-      "out": { "role": "switch_out", "required": true }
+      "in": {
+        "role": "switch_in",
+        "required": true
+      },
+      "out": {
+        "role": "switch_out",
+        "required": true
+      }
     }
-  }
+  },
+  "description": "The master on/off switch. It sits directly in the battery's positive line, so switching off cuts power to absolutely everything — a competition tech-check requirement."
 }

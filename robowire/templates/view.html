@@ -50,6 +50,7 @@
     display: inline-block; font-size: 10px; letter-spacing: 0.1em; padding: 1px 8px;
     border-radius: 3px; font-weight: 700; color: #0d1114; margin-bottom: 8px;
   }
+  #inspector .about { font-size: 12.5px; line-height: 1.5; margin: 6px 0 10px; text-wrap: pretty; }
   #inspector .kv { display: grid; grid-template-columns: 74px 1fr; gap: 3px 10px; font-size: 12px; }
   #inspector .kv dt { color: var(--dim); margin: 0; }
   #inspector .kv dd { margin: 0; font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
@@ -86,11 +87,13 @@ const SCENE =
   "use strict";
   const COLORS = {
     vbat: "#e05c50", v5: "#e8a33d", v33: "#c3c94f", gnd: "#7d8b93",
-    pwm: "#4f9dd6", uart: "#a97fd6", i2c: "#57b48f", xshut: "#57b48f", sig: "#9aa4ab",
+    motor: "#e0784f", pwm: "#4f9dd6", uart: "#a97fd6", i2c: "#57b48f",
+    xshut: "#57b48f", sig: "#9aa4ab",
   };
   const CLASS_LABELS = {
-    vbat: "VBAT 7.4V", v5: "5V BEC", v33: "3V3 rail", gnd: "ground",
-    pwm: "ESC PWM", uart: "CRSF uart", i2c: "I2C bus", xshut: "XSHUT lines",
+    vbat: "battery power", v5: "5V supply", v33: "3.3V supply", gnd: "ground",
+    motor: "motor power", pwm: "drive commands", uart: "radio link",
+    i2c: "sensor bus", xshut: "sensor reset lines",
   };
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -306,6 +309,7 @@ const SCENE =
       insp.innerHTML =
         `<button class="close" id="inspClose">close</button>` +
         `<h2>${esc(family(w.id))}</h2>${chipHtml(w.class)}` +
+        `<p class="about">${esc(w.about)}</p>` +
         `<dl class="kv"><dt>carries</dt><dd>${esc(w.carries)}</dd></dl>` +
         `<ul class="ends">` +
         w.ends_detail.map(d => `<li>· ${esc(d)}</li>`).join("") +
@@ -317,6 +321,7 @@ const SCENE =
       insp.innerHTML =
         `<button class="close" id="inspClose">close</button>` +
         `<h2>${esc(n.id)}</h2><span class="chip" style="background:#8b969b">${esc(n.kind)}</span>` +
+        `<p class="about">${esc(n.about)}</p>` +
         `<dl class="kv">` +
         n.detail.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("") +
         `</dl>` +

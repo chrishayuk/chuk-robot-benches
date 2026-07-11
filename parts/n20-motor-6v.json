@@ -6,8 +6,15 @@
   "notes": "brushed N20 gearmotor, 6V winding; curve fitted at Station 2 later",
   "elec": {
     "pins": {
-      "M+": { "role": "motor_in", "required": true },
-      "M-": { "role": "motor_in", "required": true }
+      "M+": {
+        "role": "motor_in",
+        "required": true
+      },
+      "M-": {
+        "role": "motor_in",
+        "required": true
+      }
     }
-  }
+  },
+  "description": "A geared drive motor. It spins one wheel: drive both motors the same way to go straight, opposite ways to spin on the spot."
 }

@@ -6,9 +6,24 @@
   "notes": "ELRS receiver, CRSF out",
   "elec": {
     "pins": {
-      "VIN": { "role": "power_in", "v_range": [4.5, 5.5], "required": true },
-      "GND": { "role": "gnd", "required": true },
-      "TX":  { "role": "signal_out", "signal": "uart", "required": true }
+      "VIN": {
+        "role": "power_in",
+        "v_range": [
+          4.5,
+          5.5
+        ],
+        "required": true
+      },
+      "GND": {
+        "role": "gnd",
+        "required": true
+      },
+      "TX": {
+        "role": "signal_out",
+        "signal": "uart",
+        "required": true
+      }
     }
-  }
+  },
+  "description": "The radio receiver. It picks up the driver's transmitter and streams stick positions to the brain; when the link dies, it is the first domino in the failsafe chain."
 }

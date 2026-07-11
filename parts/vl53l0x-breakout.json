@@ -8,12 +8,37 @@
   "notes": "downward edge-detection ToF; dual units need XSHUT reassignment (robowire E20)",
   "elec": {
     "pins": {
-      "VIN":   { "role": "power_in", "v_range": [2.6, 5.5], "required": true },
-      "GND":   { "role": "gnd", "required": true },
-      "SDA":   { "role": "bus_sda", "required": true },
-      "SCL":   { "role": "bus_scl", "required": true },
-      "XSHUT": { "role": "gpio_in" }
+      "VIN": {
+        "role": "power_in",
+        "v_range": [
+          2.6,
+          5.5
+        ],
+        "required": true
+      },
+      "GND": {
+        "role": "gnd",
+        "required": true
+      },
+      "SDA": {
+        "role": "bus_sda",
+        "required": true
+      },
+      "SCL": {
+        "role": "bus_scl",
+        "required": true
+      },
+      "XSHUT": {
+        "role": "gpio_in"
+      }
     },
-    "bus": { "kind": "i2c", "default_addr": "0x29", "addr_reassignable": true, "requires_xshut": true, "io_v": 3.3 }
-  }
+    "bus": {
+      "kind": "i2c",
+      "default_addr": "0x29",
+      "addr_reassignable": true,
+      "requires_xshut": true,
+      "io_v": 3.3
+    }
+  },
+  "description": "A floor sensor: a tiny downward-pointing laser rangefinder. When the floor suddenly reads far away, the robot is about to drive off the edge — this is the failsafe's eyes."
 }

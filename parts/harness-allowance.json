@@ -3,5 +3,6 @@
   "kind": "wiring",
   "mass_g": 4.0,
   "provisional": true,
-  "notes": "authored allowance until robowire M1 derives wiring mass from gauge x length"
+  "notes": "authored allowance until robowire M1 derives wiring mass from gauge x length",
+  "description": "Not a real component — a budgeted mass allowance for the wiring loom itself, until robowire derives the true figure from wire gauges and lengths."
 }

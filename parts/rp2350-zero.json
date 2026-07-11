@@ -6,16 +6,71 @@
   "notes": "RP2350 board; reflex organ host",
   "elec": {
     "pins": {
-      "5V":  { "role": "power_in", "v_range": [4.5, 5.5], "required": true },
-      "GND": { "role": "gnd", "required": true },
-      "3V3": { "role": "power_out", "volts": 3.3, "max_a": 0.3 },
-      "GP1": { "role": "mcu_io", "caps": ["uart_rx", "gpio"] },
-      "GP2": { "role": "mcu_io", "caps": ["pwm", "gpio"] },
-      "GP3": { "role": "mcu_io", "caps": ["pwm", "gpio"] },
-      "GP4": { "role": "mcu_io", "caps": ["i2c_sda", "gpio"] },
-      "GP5": { "role": "mcu_io", "caps": ["i2c_scl", "gpio"] },
-      "GP6": { "role": "mcu_io", "caps": ["gpio"] },
-      "GP7": { "role": "mcu_io", "caps": ["gpio"] }
+      "5V": {
+        "role": "power_in",
+        "v_range": [
+          4.5,
+          5.5
+        ],
+        "required": true
+      },
+      "GND": {
+        "role": "gnd",
+        "required": true
+      },
+      "3V3": {
+        "role": "power_out",
+        "volts": 3.3,
+        "max_a": 0.3
+      },
+      "GP1": {
+        "role": "mcu_io",
+        "caps": [
+          "uart_rx",
+          "gpio"
+        ]
+      },
+      "GP2": {
+        "role": "mcu_io",
+        "caps": [
+          "pwm",
+          "gpio"
+        ]
+      },
+      "GP3": {
+        "role": "mcu_io",
+        "caps": [
+          "pwm",
+          "gpio"
+        ]
+      },
+      "GP4": {
+        "role": "mcu_io",
+        "caps": [
+          "i2c_sda",
+          "gpio"
+        ]
+      },
+      "GP5": {
+        "role": "mcu_io",
+        "caps": [
+          "i2c_scl",
+          "gpio"
+        ]
+      },
+      "GP6": {
+        "role": "mcu_io",
+        "caps": [
+          "gpio"
+        ]
+      },
+      "GP7": {
+        "role": "mcu_io",
+        "caps": [
+          "gpio"
+        ]
+      }
     }
-  }
+  },
+  "description": "The brain. It runs the reflex kernel: reads the sensors, listens to the radio, and commands the motor controller. Its onboard regulator also feeds the 3.3V sensors."
 }

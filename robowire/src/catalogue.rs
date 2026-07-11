@@ -25,6 +25,9 @@ pub struct ElecPart {
     pub mass_g: f64,
     #[serde(default)]
     pub notes: String,
+    /// Plain-English "what this is and what it does" (inspector prose).
+    #[serde(default)]
+    pub description: String,
     #[serde(default)]
     pub elec: Option<Elec>,
 }

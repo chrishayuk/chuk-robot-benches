@@ -17,6 +17,8 @@ struct Node {
     pos: [f64; 3],
     size: [f64; 3],
     kind: String,
+    /// Plain-English: what this is and what it does on this robot.
+    about: String,
     /// Dossier rows for the inspector panel: [label, value].
     detail: Vec<[String; 2]>,
     /// Every connection this instance participates in.
@@ -41,6 +43,8 @@ struct Wire {
     ends: Vec<String>,
     /// What this wire carries, human-stated.
     carries: String,
+    /// Plain-English: what this wire does in the system, whole sentences.
+    about: String,
     /// Why it exists / which rule governs it.
     note: String,
     /// Per-endpoint explanation: "esc.VIN — power input (rated 6–9 V)".
@@ -195,9 +199,17 @@ fn class_note(class: &str) -> &'static str {
     }
 }
 
-fn wire_class(volts: Option<f64>, signal: Option<&str>, is_gnd: bool) -> String {
+fn wire_class(
+    volts: Option<f64>,
+    signal: Option<&str>,
+    is_gnd: bool,
+    is_motor: bool,
+) -> String {
     if is_gnd {
         return "gnd".into();
+    }
+    if is_motor {
+        return "motor".into();
     }
     if let Some(v) = volts {
         if v > 6.0 {
@@ -300,11 +312,115 @@ pub fn build_scene(
         let is_gnd = net.volts.is_none()
             && net.signal.is_none()
             && net.pins.iter().any(|p| p.ends_with(".GND") || p.ends_with(".-"));
+        let is_motor = net.pins.iter().any(|p| {
+            decl_of(p).map_or(false, |(_, d)| d.role == "motor_in" || d.role == "motor_out")
+        });
         net_class.insert(
             net.id.clone(),
-            wire_class(net.volts, net.signal.as_deref(), is_gnd),
+            wire_class(net.volts, net.signal.as_deref(), is_gnd, is_motor),
         );
     }
+
+    // Plain-English naming with left/right from actual placement.
+    let side_of = |inst: &str| -> &'static str {
+        match positions.get(inst) {
+            Some((p, _)) if p[1] > 1.0 => "left ",
+            Some((p, _)) if p[1] < -1.0 => "right ",
+            _ => "",
+        }
+    };
+    let who = |inst: &str| -> String {
+        let kind = positions.get(inst).map(|(_, k)| k.as_str()).unwrap_or("");
+        let side = side_of(inst);
+        let noun = match kind {
+            "battery" => "the battery pack".to_string(),
+            "switch" => "the power switch".to_string(),
+            "esc" => "the motor controller".to_string(),
+            "mcu" => "the brain".to_string(),
+            "radio" => "the radio receiver".to_string(),
+            "tof" => format!("the {side}floor sensor"),
+            "imu" => "the motion sensor".to_string(),
+            "motor" => format!("the {side}drive motor"),
+            _ => format!("'{inst}'"),
+        };
+        format!("{noun} ({inst})")
+    };
+    let insts_of = |pins: &[String]| -> Vec<String> {
+        let mut seen = Vec::new();
+        for p in pins {
+            if let Ok((i, _)) = split_pin(p) {
+                if !seen.contains(&i.to_string()) {
+                    seen.push(i.to_string());
+                }
+            }
+        }
+        seen
+    };
+    let list_who = |insts: &[String], skip: &str| -> String {
+        let named: Vec<String> =
+            insts.iter().filter(|i| *i != skip).map(|i| who(i)).collect();
+        match named.len() {
+            0 => String::new(),
+            1 => named[0].clone(),
+            _ => format!(
+                "{} and {}",
+                named[..named.len() - 1].join(", "),
+                named[named.len() - 1]
+            ),
+        }
+    };
+    let wire_about = |class: &str, net: &crate::schema::Net| -> String {
+        let insts = insts_of(&net.pins);
+        match class {
+            "vbat" => format!(
+                "The robot's main power line: raw {} V battery power flowing from {} to {}. \
+                 Nothing downstream runs without it.",
+                net.volts.unwrap_or(7.4),
+                who(&insts[0]),
+                list_who(&insts, &insts[0]),
+            ),
+            "v5" => format!(
+                "The 5-volt supply. The motor controller's built-in regulator makes clean 5 V \
+                 from battery power and feeds it to {} — this is what keeps them alive.",
+                list_who(&insts, "esc"),
+            ),
+            "v33" => format!(
+                "The 3.3-volt sensor supply. The brain's onboard regulator powers {} through \
+                 this line.",
+                list_who(&insts, "mcu"),
+            ),
+            "gnd" => "The shared ground return. Every component's current flows back to the \
+                      battery through this line — it is the other half of every circuit on \
+                      the robot."
+                .to_string(),
+            "motor" => {
+                let m = insts
+                    .iter()
+                    .find(|i| positions.get(*i).map_or(false, |(_, k)| k == "motor"));
+                format!(
+                    "Motor power: the motor controller pushes current down this wire to spin \
+                     {}. Reverse the current and the wheel reverses.",
+                    m.map(|i| who(i)).unwrap_or_else(|| "the motor".into()),
+                )
+            }
+            "pwm" => {
+                let target = insts
+                    .iter()
+                    .find(|i| positions.get(*i).map_or(false, |(_, k)| k == "esc"));
+                format!(
+                    "A drive command line: the brain tells {} how fast to run one motor \
+                     channel by sending timed pulses (PWM) down this wire. On radio loss the \
+                     failsafe holds it at neutral, which is what stops the robot.",
+                    target.map(|i| who(i)).unwrap_or_else(|| "the ESC".into()),
+                )
+            }
+            "uart" => "The control link: the radio receiver streams the driver's stick \
+                       positions to the brain over this wire. If those frames stop arriving, \
+                       the brain knows the radio is gone and triggers the failsafe."
+                .to_string(),
+            _ => "A signal line.".to_string(),
+        }
+    };
 
     let nodes: Vec<Node> = positions
         .iter()
@@ -418,12 +534,22 @@ pub fn build_scene(
                 }
             }
 
+            let mut about = if part.description.is_empty() {
+                format!("A {} (no catalogue description yet).", part.kind)
+            } else {
+                part.description.clone()
+            };
+            let side = side_of(inst).trim();
+            if !side.is_empty() && (kind == "tof" || kind == "motor") {
+                about.push_str(&format!(" This unit handles the {side} side."));
+            }
             Node {
                 id: (*inst).clone(),
                 part: part_id.clone(),
                 pos: *pos,
                 size: size_for(kind),
                 kind: kind.clone(),
+                about,
                 detail,
                 conns,
             }
@@ -434,6 +560,7 @@ pub fn build_scene(
     for (wi, net) in nl.nets.iter().enumerate() {
         let class = net_class[&net.id].clone();
         let carries = class_carries(&class, net.volts);
+        let about = wire_about(&class, net);
         let note = class_note(&class).to_string();
         let ends_detail: Vec<String> = net.pins.iter().map(|p| end_detail(p)).collect();
         let ends: Vec<[f64; 3]> = net
@@ -451,6 +578,7 @@ pub fn build_scene(
                 pts: arc(ends[0], ends[1], lift),
                 ends: end_names,
                 carries,
+                about,
                 note,
                 ends_detail,
             });
@@ -470,6 +598,7 @@ pub fn build_scene(
                     pts: arc(*e, j, 4.0),
                     ends: end_names.clone(),
                     carries: carries.clone(),
+                    about: about.clone(),
                     note: note.clone(),
                     ends_detail: ends_detail.clone(),
                 });
@@ -508,6 +637,13 @@ pub fn build_scene(
                         pts: arc(m, d, 16.0 + off.abs() * 2.0),
                         ends: vec![bus.sda.clone(), format!("{}.SDA/SCL", dev.inst)],
                         carries: format!("I2C {line} — {} at {final_addr}", dev.inst),
+                        about: format!(
+                            "The sensor party line ({line}): the brain polls each sensor in \
+                             turn over this shared two-wire bus — one wire carries the data \
+                             (SDA), the other the clock that paces it (SCL). This branch goes \
+                             to {}, which answers only to address {final_addr}.",
+                            who(&dev.inst),
+                        ),
                         note: format!("Bus map after reassignment: {}", addr_map.join(", ")),
                         ends_detail: vec![
                             end_detail(if dashed { &bus.scl } else { &bus.sda }),
@@ -528,6 +664,13 @@ pub fn build_scene(
                         pts: arc(a, b, 22.0),
                         ends: vec![x.clone(), format!("{}.XSHUT", dev.inst)],
                         carries: class_carries("xshut", None),
+                        about: format!(
+                            "A wake-up line for address surgery: both floor sensors boot at \
+                             the same address, so at power-up the brain holds {} in reset \
+                             through this wire while it renames the other one. After that, \
+                             both can share the bus without talking over each other.",
+                            who(&dev.inst),
+                        ),
                         note: class_note("xshut").to_string(),
                         ends_detail: vec![
                             end_detail(x),

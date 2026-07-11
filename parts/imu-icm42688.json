@@ -6,11 +6,34 @@
   "notes": "IMU breakout",
   "elec": {
     "pins": {
-      "VIN": { "role": "power_in", "v_range": [1.7, 3.6], "required": true },
-      "GND": { "role": "gnd", "required": true },
-      "SDA": { "role": "bus_sda", "required": true },
-      "SCL": { "role": "bus_scl", "required": true }
+      "VIN": {
+        "role": "power_in",
+        "v_range": [
+          1.7,
+          3.6
+        ],
+        "required": true
+      },
+      "GND": {
+        "role": "gnd",
+        "required": true
+      },
+      "SDA": {
+        "role": "bus_sda",
+        "required": true
+      },
+      "SCL": {
+        "role": "bus_scl",
+        "required": true
+      }
     },
-    "bus": { "kind": "i2c", "default_addr": "0x68", "addr_reassignable": false, "requires_xshut": false, "io_v": 3.3 }
-  }
+    "bus": {
+      "kind": "i2c",
+      "default_addr": "0x68",
+      "addr_reassignable": false,
+      "requires_xshut": false,
+      "io_v": 3.3
+    }
+  },
+  "description": "The motion sensor. It measures acceleration and rotation so the brain knows how the robot is actually moving — the foundation of braking and flip detection."
 }
