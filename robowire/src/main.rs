@@ -59,8 +59,85 @@ fn cmd_view(args: &[String]) {
     }
 }
 
+fn cmd_design(args: &[String]) {
+    let flag = |name: &str| {
+        args.iter()
+            .position(|a| a == name)
+            .and_then(|i| args.get(i + 1).cloned())
+    };
+    let parts_dir = PathBuf::from(flag("--parts").unwrap_or_else(|| "parts".into()));
+    // Parts as raw JSON values (descriptions and all) for the palette.
+    let mut entries = Vec::new();
+    let mut paths: Vec<_> = std::fs::read_dir(&parts_dir)
+        .unwrap_or_else(|e| die(&format!("{parts_dir:?}: {e}")))
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().map_or(false, |x| x == "json"))
+        .collect();
+    paths.sort();
+    for path in paths {
+        let v: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(&path).unwrap_or_else(|e| die(&format!("{path:?}: {e}"))),
+        )
+        .unwrap_or_else(|e| die(&format!("{path:?}: {e}")));
+        entries.push(v);
+    }
+    let parts_json = serde_json::to_string(&entries).unwrap();
+
+    let netlist_json = match flag("--netlist") {
+        Some(f) => {
+            let v: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(&f).unwrap_or_else(|e| die(&format!("{f}: {e}"))),
+            )
+            .unwrap_or_else(|e| die(&format!("{f}: {e}")));
+            serde_json::to_string(&v).unwrap()
+        }
+        None => "null".to_string(),
+    };
+
+    let wasm_path = PathBuf::from(flag("--wasm").unwrap_or_else(|| {
+        "robowire-wasm/target/wasm32-unknown-unknown/release/robowire_wasm.wasm".into()
+    }));
+    let wasm = std::fs::read(&wasm_path).unwrap_or_else(|e| {
+        die(&format!(
+            "{wasm_path:?}: {e} — build it with: cargo build --release --target wasm32-unknown-unknown (in robowire-wasm/)"
+        ))
+    });
+    let b64 = {
+        // minimal base64 (no new deps)
+        const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut out = String::with_capacity(wasm.len() * 4 / 3 + 4);
+        for chunk in wasm.chunks(3) {
+            let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+            let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
+            out.push(T[(n >> 18) as usize & 63] as char);
+            out.push(T[(n >> 12) as usize & 63] as char);
+            out.push(if chunk.len() > 1 { T[(n >> 6) as usize & 63] as char } else { '=' });
+            out.push(if chunk.len() > 2 { T[n as usize & 63] as char } else { '=' });
+        }
+        out
+    };
+
+    let template = include_str!("../templates/designer.html");
+    let html = template
+        .replace("//__PARTS__\n[];", &format!("{parts_json};"))
+        .replace("//__NETLIST__\nnull;", &format!("{netlist_json};"))
+        .replace("//__WASM__\n\"\";", &format!("\"{b64}\";"));
+    let out = flag("--out").unwrap_or_else(|| "robowire-designer.html".into());
+    std::fs::write(&out, html).unwrap_or_else(|e| die(&format!("writing {out}: {e}")));
+    println!("wrote {out}");
+    if !args.iter().any(|a| a == "--no-open") {
+        let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+        if let Err(e) = std::process::Command::new(opener).arg(&out).spawn() {
+            eprintln!("could not launch browser ({e}); open {out} manually");
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(|s| s.as_str()) == Some("design") {
+        return cmd_design(&args[1..]);
+    }
     if args.first().map(|s| s.as_str()) == Some("render") && args.len() >= 2 {
         return cmd_render(&args[1..]);
     }
@@ -69,7 +146,7 @@ fn main() {
     }
     if args.first().map(|s| s.as_str()) != Some("check") || args.len() < 2 {
         eprintln!(
-            "usage: robowire <check|render|view> <netlist.json> [--robot robot.json] [--parts DIR] [--out FILE]"
+            "usage: robowire <check|render|view|design> [netlist.json] [--robot robot.json] [--netlist F] [--parts DIR] [--out FILE]"
         );
         std::process::exit(2);
     }

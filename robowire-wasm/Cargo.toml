@@ -1,0 +1,11 @@
+[package]
+name = "robowire-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+robowire = { path = "../robowire" }
+serde_json = { version = "1", features = ["float_roundtrip"] }

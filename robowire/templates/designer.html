@@ -1,0 +1,601 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>robowire designer</title>
+<style>
+  :root {
+    --bg: #0d1114; --panel: #161c20; --panel2: #1d2429; --line: #2a3339;
+    --ink: #e6e9e4; --dim: #8b969b; --accent: #e8a33d; --ok: #57b48f; --bad: #e05c50;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); overflow: hidden;
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    display: grid; grid-template-columns: 240px 1fr 340px; grid-template-rows: 48px 1fr;
+    grid-template-areas: "head head head" "left canvas right";
+  }
+  header {
+    grid-area: head; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+    border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 {
+    margin: 0; font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase;
+    font-family: "Avenir Next Condensed", "Arial Narrow", sans-serif;
+  }
+  header input#nlname {
+    background: var(--panel2); border: 1px solid var(--line); color: var(--ink);
+    border-radius: 4px; padding: 4px 8px; font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+    width: 220px;
+  }
+  header .spacer { flex: 1; }
+  button {
+    background: var(--panel2); border: 1px solid var(--line); color: var(--ink);
+    border-radius: 4px; padding: 5px 12px; cursor: pointer; font-size: 12px;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #14100a; font-weight: 700; border-color: var(--accent); }
+  button.mini { padding: 1px 7px; font-size: 10px; }
+  #left { grid-area: left; border-right: 1px solid var(--line); overflow-y: auto; padding: 10px; background: var(--panel); }
+  #right { grid-area: right; border-left: 1px solid var(--line); overflow-y: auto; padding: 10px; background: var(--panel); }
+  #board { grid-area: canvas; display: block; width: 100%; height: 100%; cursor: default; }
+  h2 {
+    font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim);
+    font-family: "Avenir Next Condensed", "Arial Narrow", sans-serif; margin: 12px 0 6px;
+  }
+  .part {
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+    padding: 5px 7px; border: 1px solid var(--line); border-radius: 4px; margin-bottom: 5px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+  }
+  .part .k { color: var(--dim); font-size: 9px; }
+  .row {
+    border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; margin-bottom: 6px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+  }
+  .row.sel { border-color: var(--accent); }
+  .row .hd { display: flex; gap: 6px; align-items: center; }
+  .row input, .row select {
+    background: var(--panel2); border: 1px solid var(--line); color: var(--ink);
+    border-radius: 3px; padding: 2px 5px; font-family: inherit; font-size: 11px;
+  }
+  .row input.id { width: 88px; }
+  .row input.volts { width: 48px; }
+  .row .pins { color: var(--dim); margin-top: 4px; overflow-wrap: anywhere; }
+  .check { display: flex; gap: 7px; align-items: baseline; padding: 3px 0; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+  .check .pill { font-weight: 700; padding: 0 6px; border-radius: 3px; font-size: 10px; color: #0d1114; flex-shrink: 0; }
+  .check .d { color: var(--dim); }
+  #verdict { font-family: ui-monospace, Menlo, monospace; font-weight: 700; padding: 6px 8px; border-radius: 4px; margin-bottom: 6px; }
+  #verdict.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
+  #verdict.bad { background: color-mix(in srgb, var(--bad) 22%, transparent); color: var(--bad); }
+  #hint { position: fixed; bottom: 10px; left: 254px; color: var(--dim); font-size: 11px;
+    background: color-mix(in srgb, var(--panel) 85%, transparent); padding: 4px 10px; border-radius: 4px; }
+  dialog {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+    max-width: 640px; width: 80vw;
+  }
+  dialog::backdrop { background: rgba(0,0,0,0.6); }
+  dialog textarea { width: 100%; height: 300px; background: var(--panel2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 4px; font: 11px ui-monospace, Menlo, monospace; }
+  textarea#fsloss { width: 100%; height: 54px; background: var(--panel2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 4px; font: 11px ui-monospace, Menlo, monospace; }
+  label.ck { display: flex; gap: 6px; align-items: center; font-size: 11px; font-family: ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>robowire <span style="color:var(--accent)">designer</span></h1>
+  <input id="nlname" title="netlist name">
+  <span class="spacer"></span>
+  <button id="importBtn">import</button>
+  <button id="exportBtn" class="primary">export netlist</button>
+</header>
+<div id="left">
+  <h2>parts catalogue — click to place</h2>
+  <div id="palette"></div>
+</div>
+<canvas id="board"></canvas>
+<div id="right">
+  <div id="verdict"></div>
+  <div id="checks"></div>
+  <h2>nets — click a pin, then another, to wire</h2>
+  <div id="nets"></div>
+  <h2>i2c buses</h2>
+  <div id="buses"></div>
+  <button id="addBus" class="mini">+ add bus</button>
+  <h2>failsafe declaration (E41)</h2>
+  <textarea id="fsloss" placeholder="what happens on radio loss…"></textarea>
+  <div id="fspins" style="margin-top:4px"></div>
+</div>
+<div id="hint"></div>
+<dialog id="ioDialog">
+  <h2 id="ioTitle">netlist json</h2>
+  <textarea id="ioText"></textarea>
+  <div style="display:flex; gap:8px; margin-top:8px">
+    <button id="ioApply" class="primary">apply</button>
+    <button id="ioDownload">download file</button>
+    <button id="ioClose">close</button>
+  </div>
+</dialog>
+<script>
+const PARTS =
+//__PARTS__
+[];
+const START_NETLIST =
+//__NETLIST__
+null;
+const WASM_B64 =
+//__WASM__
+"";
+
+(async function () {
+  "use strict";
+
+  // ---- the real checker, in-browser --------------------------------------
+  const bytes = Uint8Array.from(atob(WASM_B64), c => c.charCodeAt(0));
+  const { instance } = await WebAssembly.instantiate(bytes, {});
+  const W = instance.exports;
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  function callChecks(netlistObj) {
+    const nl = enc.encode(JSON.stringify(netlistObj));
+    const ps = enc.encode(JSON.stringify(PARTS));
+    const p1 = W.wasm_alloc(nl.length), p2 = W.wasm_alloc(ps.length);
+    new Uint8Array(W.memory.buffer, p1, nl.length).set(nl);
+    new Uint8Array(W.memory.buffer, p2, ps.length).set(ps);
+    W.run_checks_json(p1, nl.length, p2, ps.length);
+    W.wasm_free(p1, nl.length); W.wasm_free(p2, ps.length);
+    const out = new Uint8Array(W.memory.buffer, W.out_ptr(), W.out_len());
+    return JSON.parse(dec.decode(out));
+  }
+
+  // ---- model ---------------------------------------------------------------
+  const partById = {};
+  for (const p of PARTS) partById[p.id] = p;
+  let nl = START_NETLIST || { name: "new-harness", instances: {}, nets: [], buses: [], failsafe: { rx_loss: "", stop_pins: [] } };
+  if (!nl.failsafe) nl.failsafe = { rx_loss: "", stop_pins: [] };
+  if (!nl.buses) nl.buses = [];
+  const LAYOUT_KEY = () => "robowire-layout:" + nl.name;
+  let layout = {};
+  try { layout = JSON.parse(localStorage.getItem(LAYOUT_KEY()) || "{}"); } catch {}
+  function saveLayout() { try { localStorage.setItem(LAYOUT_KEY(), JSON.stringify(layout)); } catch {} }
+
+  const COLORS = {
+    vbat: "#e05c50", v5: "#e8a33d", v33: "#c3c94f", gnd: "#7d8b93",
+    motor: "#e0784f", pwm: "#4f9dd6", uart: "#a97fd6", i2c: "#57b48f", sig: "#9aa4ab",
+  };
+  const decl = ep => {
+    const [inst, pin] = splitPin(ep);
+    return partById[nl.instances[inst]]?.elec?.pins?.[pin] || null;
+  };
+  const splitPin = ep => { const i = ep.indexOf("."); return [ep.slice(0, i), ep.slice(i + 1)]; };
+  function netClass(net) {
+    const isGnd = net.volts == null && net.signal == null &&
+      net.pins.some(p => p.endsWith(".GND") || p.endsWith(".-"));
+    if (isGnd) return "gnd";
+    if (net.pins.some(p => { const d = decl(p); return d && (d.role === "motor_in" || d.role === "motor_out"); })) return "motor";
+    if (net.volts != null) return net.volts > 6 ? "vbat" : net.volts > 4 ? "v5" : "v33";
+    if (net.signal === "pwm") return "pwm";
+    if (net.signal === "uart") return "uart";
+    return "sig";
+  }
+
+  // ---- canvas layout -------------------------------------------------------
+  const cv = document.getElementById("board");
+  const cx = cv.getContext("2d");
+  let dpr = 1;
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
+    draw();
+  }
+  const BOXW = 128;
+  function pinsOf(inst) {
+    const part = partById[nl.instances[inst]];
+    return Object.keys(part?.elec?.pins || {});
+  }
+  function boxGeo(inst) {
+    const pins = pinsOf(inst);
+    const rows = Math.ceil(pins.length / 2);
+    const h = 34 + Math.max(rows, 1) * 15;
+    if (!layout[inst]) layout[inst] = [80 + Object.keys(layout).length * 40, 80 + Object.keys(layout).length * 30];
+    const [x, y] = layout[inst];
+    const pinPos = {};
+    pins.forEach((p, i) => {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      pinPos[p] = [x + side * BOXW / 2, y - h / 2 + 40 + row * 15, side];
+    });
+    return { x, y, h, pinPos };
+  }
+  function pinXY(ep) {
+    const [inst, pin] = splitPin(ep);
+    if (!(inst in nl.instances)) return null;
+    const g = boxGeo(inst);
+    return g.pinPos[pin] || null;
+  }
+
+  let pending = null;       // first pin clicked in wire mode
+  let pickHandler = null;   // active pin-pick flow (bus/failsafe forms)
+  let selNet = -1;
+  let dragInst = null, dragOff = [0, 0];
+
+  function draw() {
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
+    // grid
+    cx.strokeStyle = "#151b20"; cx.lineWidth = 1;
+    for (let g = 0; g < cv.clientWidth; g += 24) { cx.beginPath(); cx.moveTo(g, 0); cx.lineTo(g, cv.clientHeight); cx.stroke(); }
+    for (let g = 0; g < cv.clientHeight; g += 24) { cx.beginPath(); cx.moveTo(0, g); cx.lineTo(cv.clientWidth, g); cx.stroke(); }
+
+    // wires
+    nl.nets.forEach((net, i) => {
+      const col = COLORS[netClass(net)] || "#999";
+      const pts = net.pins.map(pinXY).filter(Boolean);
+      if (pts.length < 2) return;
+      const hub = pts.length > 2
+        ? [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length]
+        : null;
+      cx.strokeStyle = col;
+      cx.lineWidth = i === selNet ? 3 : 1.8;
+      cx.shadowColor = col; cx.shadowBlur = i === selNet ? 12 : 5;
+      const targets = hub ? pts.map(p => [p, hub]) : [[pts[0], pts[1]]];
+      for (const [a, b] of targets) {
+        cx.beginPath();
+        cx.moveTo(a[0], a[1]);
+        const mx = (a[0] + b[0]) / 2;
+        cx.bezierCurveTo(mx, a[1], mx, b[1], b[0], b[1]);
+        cx.stroke();
+      }
+      cx.shadowBlur = 0;
+      if (hub) { cx.fillStyle = col; cx.beginPath(); cx.arc(hub[0], hub[1], 3.4, 0, Math.PI * 2); cx.fill(); }
+    });
+    // bus wires
+    for (const bus of nl.buses) {
+      const m = pinXY(bus.sda);
+      if (!m) continue;
+      for (const dev of bus.devices) {
+        const dpin = pinXY(dev.inst + ".SDA");
+        if (!dpin) continue;
+        cx.strokeStyle = COLORS.i2c; cx.lineWidth = 1.8; cx.setLineDash([7, 4]);
+        cx.beginPath();
+        cx.moveTo(m[0], m[1]);
+        const mx = (m[0] + dpin[0]) / 2;
+        cx.bezierCurveTo(mx, m[1], mx, dpin[1], dpin[0], dpin[1]);
+        cx.stroke(); cx.setLineDash([]);
+      }
+    }
+
+    // boxes
+    for (const inst of Object.keys(nl.instances)) {
+      const g = boxGeo(inst);
+      cx.fillStyle = "#1a2126";
+      cx.strokeStyle = pending && splitPin(pending)[0] === inst ? "#e8a33d" : "#4a575f";
+      cx.lineWidth = 1.4;
+      roundRect(g.x - BOXW / 2, g.y - g.h / 2, BOXW, g.h, 6);
+      cx.fill(); cx.stroke();
+      cx.fillStyle = "#e6e9e4";
+      cx.font = "bold 11px ui-monospace, Menlo, monospace";
+      cx.fillText(inst, g.x - BOXW / 2 + 8, g.y - g.h / 2 + 15);
+      cx.fillStyle = "#7d8b93";
+      cx.font = "9px ui-monospace, Menlo, monospace";
+      cx.fillText(nl.instances[inst], g.x - BOXW / 2 + 8, g.y - g.h / 2 + 27);
+      for (const [pin, [px, py, side]] of Object.entries(g.pinPos)) {
+        const ep = inst + "." + pin;
+        const active = pending === ep;
+        cx.fillStyle = active ? "#e8a33d" : "#aab4ba";
+        cx.beginPath(); cx.arc(px, py, active ? 5 : 3.4, 0, Math.PI * 2); cx.fill();
+        cx.fillStyle = "#8b969b";
+        cx.font = "8.5px ui-monospace, Menlo, monospace";
+        cx.textAlign = side < 0 ? "right" : "left";
+        cx.fillText(pin, px + side * 8, py + 3);
+        cx.textAlign = "left";
+      }
+    }
+    // pending wire rubber band hint
+    hint(pending ? `wiring from ${pending} — click another pin (esc cancels)` :
+      pickHandler ? "pick a pin…" : "");
+  }
+  function roundRect(x, y, w, h, r) {
+    cx.beginPath();
+    cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r);
+    cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath();
+  }
+  function hint(t) { document.getElementById("hint").textContent = t; }
+
+  // ---- interactions ----------------------------------------------------------
+  function pinAt(mx, my) {
+    for (const inst of Object.keys(nl.instances)) {
+      const g = boxGeo(inst);
+      for (const [pin, [px, py]] of Object.entries(g.pinPos)) {
+        if (Math.hypot(mx - px, my - py) < 8) return inst + "." + pin;
+      }
+    }
+    return null;
+  }
+  function instAt(mx, my) {
+    for (const inst of Object.keys(nl.instances).reverse()) {
+      const g = boxGeo(inst);
+      if (Math.abs(mx - g.x) < BOXW / 2 && Math.abs(my - g.y) < g.h / 2) return inst;
+    }
+    return null;
+  }
+  cv.addEventListener("pointerdown", e => {
+    const mx = e.offsetX, my = e.offsetY;
+    const pin = pinAt(mx, my);
+    if (pin) {
+      if (pickHandler) { const h = pickHandler; pickHandler = null; h(pin); refresh(); return; }
+      if (!pending) { pending = pin; }
+      else if (pending !== pin) {
+        const net = { id: autoNetId(pending, pin), pins: [pending, pin] };
+        const d1 = decl(pending), d2 = decl(pin);
+        const src = [d1, d2].find(d => d && (d.role === "power_out"));
+        if (src) net.volts = src.volts;
+        else if ([d1, d2].some(d => d && d.role === "pos")) net.volts = 7.4;
+        const sig = [d1, d2].find(d => d && d.signal);
+        if (!net.volts && sig) net.signal = sig.signal === "crsf" ? "uart" : sig.signal;
+        nl.nets.push(net);
+        selNet = nl.nets.length - 1;
+        pending = null;
+        refresh(); return;
+      } else pending = null;
+      draw(); return;
+    }
+    const inst = instAt(mx, my);
+    if (inst) {
+      dragInst = inst;
+      dragOff = [mx - layout[inst][0], my - layout[inst][1]];
+      cv.setPointerCapture(e.pointerId);
+      return;
+    }
+    pending = null; draw();
+  });
+  cv.addEventListener("pointermove", e => {
+    if (dragInst) {
+      layout[dragInst] = [e.offsetX - dragOff[0], e.offsetY - dragOff[1]];
+      draw();
+    }
+  });
+  cv.addEventListener("pointerup", () => { if (dragInst) { dragInst = null; saveLayout(); } });
+  window.addEventListener("keydown", e => {
+    if (e.key === "Escape") { pending = null; pickHandler = null; draw(); hint(""); }
+  });
+  function autoNetId(a, b) {
+    const base = (splitPin(a)[1] + "_" + splitPin(b)[0]).toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    let id = base, k = 2;
+    while (nl.nets.some(n => n.id === id)) id = base + "_" + k++;
+    return id;
+  }
+
+  // ---- panels -----------------------------------------------------------------
+  function renderPalette() {
+    const el = document.getElementById("palette");
+    el.innerHTML = "";
+    for (const p of PARTS) {
+      const div = document.createElement("div");
+      div.className = "part";
+      div.innerHTML = `<span>${p.id}<br><span class="k">${p.kind}</span></span>`;
+      const btn = document.createElement("button");
+      btn.className = "mini"; btn.textContent = "+ place";
+      btn.title = p.description || "";
+      btn.addEventListener("click", () => {
+        let base = p.kind === "motor" ? "m" : p.kind === "tof" ? "tof" : p.kind;
+        let name = base, k = 2;
+        const short = { battery: "batt", switch: "sw", radio: "rx", mcu: "mcu", esc: "esc", imu: "imu" };
+        name = short[p.kind] || base;
+        let cand = name;
+        while (cand in nl.instances) cand = name + "_" + k++;
+        nl.instances[cand] = p.id;
+        refresh();
+      });
+      div.appendChild(btn);
+      el.appendChild(div);
+    }
+  }
+
+  function renderNets() {
+    const el = document.getElementById("nets");
+    el.innerHTML = "";
+    nl.nets.forEach((net, i) => {
+      const div = document.createElement("div");
+      div.className = "row" + (i === selNet ? " sel" : "");
+      const col = COLORS[netClass(net)] || "#999";
+      div.innerHTML =
+        `<div class="hd"><span style="width:10px;height:10px;border-radius:2px;background:${col};display:inline-block"></span>` +
+        `<input class="id" value="${net.id}"> V:<input class="volts" value="${net.volts ?? ""}" placeholder="—">` +
+        ` sig:<select><option value="">—</option><option${net.signal === "pwm" ? " selected" : ""}>pwm</option><option${net.signal === "uart" ? " selected" : ""}>uart</option></select>` +
+        ` <button class="mini del">✕</button></div>` +
+        `<div class="pins">${net.pins.join(" · ")} <button class="mini addpin">+pin</button></div>`;
+      div.addEventListener("click", () => { if (selNet !== i) { selNet = i; renderNets(); draw(); } });
+      div.querySelector(".id").addEventListener("change", e => { net.id = e.target.value; refresh(); });
+      div.querySelector(".volts").addEventListener("change", e => {
+        const v = parseFloat(e.target.value);
+        if (isNaN(v)) delete net.volts; else net.volts = v;
+        refresh();
+      });
+      div.querySelector("select").addEventListener("change", e => {
+        if (e.target.value) net.signal = e.target.value; else delete net.signal;
+        refresh();
+      });
+      div.querySelector(".del").addEventListener("click", e => { e.stopPropagation(); nl.nets.splice(i, 1); selNet = -1; refresh(); });
+      div.querySelector(".addpin").addEventListener("click", e => {
+        e.stopPropagation();
+        hint("pick a pin to add to " + net.id);
+        pickHandler = pin => { if (!net.pins.includes(pin)) net.pins.push(pin); };
+      });
+      el.appendChild(div);
+    });
+  }
+
+  function pinSelectBtn(current, onpick) {
+    const b = document.createElement("button");
+    b.className = "mini";
+    b.textContent = current || "pick pin";
+    b.addEventListener("click", () => {
+      hint("pick a pin…");
+      pickHandler = pin => { onpick(pin); };
+    });
+    return b;
+  }
+
+  function renderBuses() {
+    const el = document.getElementById("buses");
+    el.innerHTML = "";
+    nl.buses.forEach((bus, bi) => {
+      const div = document.createElement("div");
+      div.className = "row";
+      const hd = document.createElement("div");
+      hd.className = "hd";
+      hd.innerHTML = `<b>${bus.id}</b> (${bus.kind}) sda:${bus.sda} scl:${bus.scl} `;
+      const del = document.createElement("button"); del.className = "mini"; del.textContent = "✕";
+      del.addEventListener("click", () => { nl.buses.splice(bi, 1); refresh(); });
+      hd.appendChild(del);
+      div.appendChild(hd);
+      bus.devices.forEach((dev, di) => {
+        const d = document.createElement("div");
+        d.className = "pins";
+        d.innerHTML = `${dev.inst} @${dev.addr}` +
+          (dev.reassign_to ? ` → ${dev.reassign_to}` : "") +
+          (dev.xshut ? ` (xshut ${dev.xshut})` : "") + " ";
+        const rm = document.createElement("button"); rm.className = "mini"; rm.textContent = "✕";
+        rm.addEventListener("click", () => { bus.devices.splice(di, 1); refresh(); });
+        d.appendChild(rm);
+        div.appendChild(d);
+      });
+      const add = document.createElement("button");
+      add.className = "mini"; add.textContent = "+ device";
+      add.addEventListener("click", () => {
+        const eligible = Object.entries(nl.instances).filter(([, pid]) => partById[pid]?.elec?.bus);
+        if (!eligible.length) { alert("no bus-capable instances placed"); return; }
+        const inst = prompt("instance (" + eligible.map(e => e[0]).join(", ") + "):", eligible[0][0]);
+        if (!inst || !(inst in nl.instances)) return;
+        const part = partById[nl.instances[inst]];
+        const dev = { inst, addr: part?.elec?.bus?.default_addr || "0x00" };
+        const re = prompt("reassign to address (blank = keep " + dev.addr + "):", "");
+        if (re) dev.reassign_to = re;
+        bus.devices.push(dev);
+        if (re || part?.elec?.bus?.requires_xshut) {
+          hint("pick the MCU pin driving " + inst + ".XSHUT");
+          pickHandler = pin => { dev.xshut = pin; refresh(); };
+        }
+        refresh();
+      });
+      div.appendChild(add);
+      el.appendChild(div);
+    });
+    document.getElementById("addBus").onclick = () => {
+      const bus = { id: "i2c" + nl.buses.length, kind: "i2c", sda: "", scl: "", devices: [] };
+      nl.buses.push(bus);
+      hint("pick the SDA pin (an MCU i2c_sda-capable pin)");
+      pickHandler = pin => {
+        bus.sda = pin;
+        hint("pick the SCL pin");
+        pickHandler = p2 => { bus.scl = p2; refresh(); };
+        draw();
+      };
+      refresh();
+    };
+  }
+
+  function renderFailsafe() {
+    const ta = document.getElementById("fsloss");
+    ta.value = nl.failsafe.rx_loss || "";
+    ta.onchange = () => { nl.failsafe.rx_loss = ta.value; refresh(); };
+    const el = document.getElementById("fspins");
+    el.innerHTML = "stop pins: " + (nl.failsafe.stop_pins.join(" · ") || "—") + " ";
+    const b = document.createElement("button");
+    b.className = "mini"; b.textContent = "+ stop pin";
+    b.addEventListener("click", () => {
+      hint("pick a stop pin (e.g. the ESC signal inputs)");
+      pickHandler = pin => {
+        if (!nl.failsafe.stop_pins.includes(pin)) nl.failsafe.stop_pins.push(pin);
+      };
+    });
+    el.appendChild(b);
+    const clr = document.createElement("button");
+    clr.className = "mini"; clr.textContent = "clear";
+    clr.addEventListener("click", () => { nl.failsafe.stop_pins = []; refresh(); });
+    el.appendChild(clr);
+  }
+
+  // ---- live checks --------------------------------------------------------------
+  let checkTimer = null;
+  function runChecksSoon() {
+    clearTimeout(checkTimer);
+    checkTimer = setTimeout(() => {
+      const res = callChecks(nl);
+      const verdict = document.getElementById("verdict");
+      const el = document.getElementById("checks");
+      if (res.error) {
+        verdict.className = "bad";
+        verdict.textContent = "SCHEMA: " + res.error;
+        el.innerHTML = "";
+        return;
+      }
+      const fails = res.checks.filter(c => !c.pass);
+      verdict.className = fails.length ? "bad" : "ok";
+      verdict.textContent = fails.length
+        ? `E-CHECK FAILURES (${fails.length}) — do not solder`
+        : "HARNESS LEGAL — all checks pass";
+      el.innerHTML = res.checks.map(c => {
+        const col = c.pass ? "var(--ok)" : "var(--bad)";
+        return `<div class="check"><span class="pill" style="background:${col}">${c.pass ? "PASS" : "FAIL"}</span>` +
+          `<span>${c.code}</span><span class="d">${c.detail}</span></div>`;
+      }).join("");
+    }, 250);
+  }
+
+  // ---- io -------------------------------------------------------------------------
+  const dlg = document.getElementById("ioDialog");
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    document.getElementById("ioTitle").textContent = "netlist json — canonical (layout not included)";
+    document.getElementById("ioText").value = JSON.stringify(nl, null, 2);
+    document.getElementById("ioApply").style.display = "none";
+    dlg.showModal();
+  });
+  document.getElementById("importBtn").addEventListener("click", () => {
+    document.getElementById("ioTitle").textContent = "paste netlist json";
+    document.getElementById("ioText").value = "";
+    document.getElementById("ioApply").style.display = "";
+    dlg.showModal();
+  });
+  document.getElementById("ioApply").addEventListener("click", () => {
+    try {
+      nl = JSON.parse(document.getElementById("ioText").value);
+      if (!nl.failsafe) nl.failsafe = { rx_loss: "", stop_pins: [] };
+      if (!nl.buses) nl.buses = [];
+      layout = {};
+      try { layout = JSON.parse(localStorage.getItem(LAYOUT_KEY()) || "{}"); } catch {}
+      dlg.close(); refresh();
+    } catch (e) { alert("parse error: " + e.message); }
+  });
+  document.getElementById("ioDownload").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(nl, null, 2) + "\n"], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nl.name + ".json";
+    a.click();
+  });
+  document.getElementById("ioClose").addEventListener("click", () => dlg.close());
+  const nameEl = document.getElementById("nlname");
+  nameEl.addEventListener("change", () => { nl.name = nameEl.value; refresh(); });
+
+  // ---- refresh --------------------------------------------------------------------
+  function refresh() {
+    nameEl.value = nl.name;
+    renderPalette();
+    renderNets();
+    renderBuses();
+    renderFailsafe();
+    draw();
+    runChecksSoon();
+  }
+  window.addEventListener("resize", resize);
+  refresh();
+  resize();
+})();
+</script>
+</body>
+</html>

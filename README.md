@@ -23,7 +23,8 @@ another's internals.
 | `robotspec/` | standalone crate: schema v0.1, derivation pipeline v0, D/X checks, body⊂robot hashing, 3D inspector (`robotspec show|view robots/<name>.json`) |
 | `parts/` | the shared content-hashed parts catalogue (robotspec + robowire cite `part@hash`) |
 | `robots/` | authored RobotSpecs — the robots, as data |
-| `robowire/` | standalone crate: netlist schema, E-check engine, schematic SVG render (`robowire check|render harness/<name>.json`) |
+| `robowire/` | standalone crate: netlist schema, E-check engine, SVG render, 3D harness view, interactive designer (`robowire check|render|view|design`) |
+| `robowire-wasm/` | the E-check engine compiled for the browser — the designer's live verifier (same code as the CLI) |
 | `harness/` | authored netlists — the wiring, as data |
 | `derived/` | committed derived artifacts (pipeline outputs, per derivation-pipeline v0 discipline) |
 

@@ -111,6 +111,18 @@ impl ElecCatalogue {
         Ok(ElecCatalogue { parts })
     }
 
+    /// Build from in-memory part values (WASM path — no filesystem). Hashes
+    /// are over each part's canonical serialization; identity-grade hashing
+    /// stays with the file-based loader.
+    pub fn from_values(parts: Vec<ElecPart>) -> Self {
+        let mut map = BTreeMap::new();
+        for p in parts {
+            let hash = sha256_hex(&serde_json::to_vec(&p).unwrap_or_default());
+            map.insert(p.id.clone(), (p, hash));
+        }
+        ElecCatalogue { parts: map }
+    }
+
     pub fn get(&self, id: &str) -> Result<&(ElecPart, String), String> {
         self.parts
             .get(id)
