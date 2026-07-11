@@ -179,6 +179,7 @@ const WASM_B64 =
   const LAYOUT_KEY = () => "robowire-layout:" + nl.name;
   let layout = {};
   try { layout = JSON.parse(localStorage.getItem(LAYOUT_KEY()) || "{}"); } catch {}
+  const hadSavedLayout = Object.keys(layout).length > 0;
   function saveLayout() { try { localStorage.setItem(LAYOUT_KEY(), JSON.stringify(layout)); } catch {} }
 
   const COLORS = {
@@ -219,7 +220,10 @@ const WASM_B64 =
     const pins = pinsOf(inst);
     const rows = Math.ceil(pins.length / 2);
     const bh = 34 + Math.max(rows, 1) * 15; // upright height
-    if (!layout[inst]) layout[inst] = [80 + Object.keys(layout).length * 40, 80 + Object.keys(layout).length * 30, 0];
+    if (!layout[inst]) {
+      const n = Object.keys(layout).length;
+      layout[inst] = [130 + (n % 5) * 180, 120 + Math.floor(n / 5) * 165, 0];
+    }
     const L = layout[inst];
     const [x, y] = L;
     const rot = ((L[2] || 0) % 360 + 360) % 360;
@@ -455,11 +459,20 @@ const WASM_B64 =
     if (ends.length === 2) {
       const [A, B] = ends;
       const d = Math.hypot(A.stub[0] - B.stub[0], A.stub[1] - B.stub[1]);
-      const k = Math.min(90, Math.max(24, d * 0.35));
+      const kFor = (from, to) => {
+        let k = Math.min(46, Math.max(16, d * 0.22));
+        // If the pin exits away from the target, keep the excursion short —
+        // enough to read which pin it leaves, no antenna spike.
+        const dx = to.stub[0] - from.stub[0], dy = to.stub[1] - from.stub[1];
+        const dot = from.out[0] * dx + from.out[1] * dy;
+        if (dot < 0) k *= 0.45;
+        return k;
+      };
+      const ka = kFor(A, B), kb = kFor(B, A);
       return {
         legs,
-        segs: [[A.stub, [A.stub[0] + A.out[0] * k, A.stub[1] + A.out[1] * k],
-                [B.stub[0] + B.out[0] * k, B.stub[1] + B.out[1] * k], B.stub]],
+        segs: [[A.stub, [A.stub[0] + A.out[0] * ka, A.stub[1] + A.out[1] * ka],
+                [B.stub[0] + B.out[0] * kb, B.stub[1] + B.out[1] * kb], B.stub]],
         hub: null,
       };
     }
@@ -471,7 +484,9 @@ const WASM_B64 =
       legs,
       segs: ends.map(e => {
         const d = Math.hypot(e.stub[0] - hub[0], e.stub[1] - hub[1]);
-        const k = Math.min(60, Math.max(16, d * 0.3));
+        let k = Math.min(30, Math.max(12, d * 0.22));
+        const dot = e.out[0] * (hub[0] - e.stub[0]) + e.out[1] * (hub[1] - e.stub[1]);
+        if (dot < 0) k *= 0.45;
         return [e.stub, [e.stub[0] + e.out[0] * k, e.stub[1] + e.out[1] * k], hub, hub];
       }),
       hub,
@@ -672,6 +687,11 @@ const WASM_B64 =
 
   function draw() {
     currentFocus = focusSet();
+    // Self-healing: never paint at a stale backing size (kills the
+    // zoomed-looking first frame regardless of layout timing).
+    dpr = window.devicePixelRatio || 1;
+    const bw = Math.round(cv.clientWidth * dpr), bh2 = Math.round(cv.clientHeight * dpr);
+    if (cv.width !== bw || cv.height !== bh2) { cv.width = bw; cv.height = bh2; }
     if (mode === "3d") { draw3(); return; }
     cx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
@@ -1328,8 +1348,13 @@ const WASM_B64 =
     runChecksSoon();
   }
   window.addEventListener("resize", resize);
-  refresh();
   resize();
+  refresh();
+  // First-ever load (no saved layout): arrange instead of the overlap
+  // cascade, once the grid has settled.
+  requestAnimationFrame(() => {
+    if (!hadSavedLayout && Object.keys(nl.instances).length) autoArrange();
+  });
 })();
 </script>
 </body>
