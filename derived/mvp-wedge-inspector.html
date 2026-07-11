@@ -1,0 +1,323 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>robot inspector</title>
+<style>
+  /* Committed dark: overlays read by glow. Same instrument family as the
+     harness view; shared scene library is the Phase-2 extraction. */
+  :root {
+    --bg: #0d1114; --panel: #161c20; --line: #2a3339; --ink: #e6e9e4;
+    --dim: #8b969b; --accent: #e8a33d; --ok: #57b48f; --warn: #e8a33d; --bad: #e05c50;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); overflow: hidden;
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+  #scene { display: block; width: 100vw; height: 100vh; cursor: grab; }
+  #scene.dragging { cursor: grabbing; }
+  .hud {
+    position: fixed; padding: 10px 14px; background: color-mix(in srgb, var(--panel) 90%, transparent);
+    border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(4px);
+  }
+  #title { top: 14px; left: 14px; max-width: 340px; }
+  #title h1 {
+    margin: 0; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase;
+    font-family: "Avenir Next Condensed", "Arial Narrow", sans-serif; font-weight: 600;
+  }
+  #title .hash { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--accent); }
+  #title .sub { color: var(--dim); font-size: 11px; }
+  #layers { bottom: 14px; left: 14px; display: flex; flex-direction: column; gap: 4px; }
+  #layers label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+  #layers input { accent-color: var(--accent); }
+  #ledger {
+    top: 14px; right: 14px; width: 330px; max-height: 88vh; overflow-y: auto;
+  }
+  #ledger h2 {
+    margin: 0 0 6px; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+    font-family: "Avenir Next Condensed", "Arial Narrow", sans-serif; color: var(--dim);
+  }
+  .lrow { display: grid; grid-template-columns: 108px 1fr; gap: 2px 10px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+  .lrow .k { color: var(--dim); }
+  .lrow .v { font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+  .lrow.ok .v { color: var(--ok); }
+  .lrow.warn .v { color: var(--warn); }
+  .lrow.bad .v { color: var(--bad); font-weight: 700; }
+  .check { display: flex; gap: 8px; align-items: baseline; font-size: 11.5px; padding: 3px 0; font-family: ui-monospace, Menlo, monospace; }
+  .check .pill { font-weight: 700; padding: 0 7px; border-radius: 3px; font-size: 10px; color: #0d1114; }
+  .check .d { color: var(--dim); }
+  #dossier { bottom: 14px; right: 14px; width: 330px; display: none; }
+  #dossier h3 { margin: 0 0 4px; font-size: 13px; }
+  #dossier .about { font-size: 12.5px; line-height: 1.5; text-wrap: pretty; }
+  #dossier .meta { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--dim); margin-top: 6px; }
+  #dossier .close { float: right; background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 4px; cursor: pointer; font-size: 11px; padding: 1px 8px; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="hud" id="title">
+  <h1 id="name">robot</h1>
+  <div class="hash" id="hash"></div>
+  <div class="sub" id="sub">every number derived, none declared — drag to orbit, wheel to zoom, click a component</div>
+</div>
+<div class="hud" id="layers"></div>
+<div class="hud" id="ledger"></div>
+<div class="hud" id="dossier"></div>
+<script>
+const SCENE =
+{"name":"mvp-wedge","revision":"r3","robot_hash":"e823a6e502da8bb3e1f7a4faff0409d8e144abd14b4688c3b85514641cf7a2e3","body_hash":"13d9db5bca2f483eda54470a18883363e415266fde8c96d3658928ad3fd81787","pipeline":"derive-v0.1.0-parametric","chassis":{"profile":[[-47.5,0.0],[47.5,0.0],[47.5,2.0],[7.5,30.0],[-47.5,30.0]],"half_width":47.5},"wheels":[{"pos":[-35.0,42.0,16.0],"radius":16.0,"width":8.0},{"pos":[-35.0,-42.0,16.0],"radius":16.0,"width":8.0}],"nodes":[{"id":"battery","part":"lipo-2s-260","kind":"battery","pos":[5.0,0.0,6.0],"size":[36.0,20.0,11.0],"about":"The robot's fuel tank: a two-cell lithium battery. Everything on the robot ultimately draws its power from here.","mass_g":18.0},{"id":"esc","part":"bbb-dual-esc","kind":"esc","pos":[-30.0,0.0,14.0],"size":[22.0,16.0,6.0],"about":"The motor controller (ESC). It turns the brain's throttle commands into switched battery power for the two drive motors, and its built-in 5V regulator (the BEC) powers the brain and radio.","mass_g":5.0},{"id":"mcu","part":"rp2350-zero","kind":"mcu","pos":[-30.0,0.0,20.0],"size":[24.0,18.0,5.0],"about":"The brain. It runs the reflex kernel: reads the sensors, listens to the radio, and commands the motor controller. Its onboard regulator also feeds the 3.3V sensors.","mass_g":2.5},{"id":"rx","part":"elrs-rx","kind":"radio","pos":[-40.0,0.0,20.0],"size":[16.0,11.0,4.0],"about":"The radio receiver. It picks up the driver's transmitter and streams stick positions to the brain; when the link dies, it is the first domino in the failsafe chain.","mass_g":1.0},{"id":"switch","part":"power-switch-slide","kind":"switch","pos":[-40.0,20.0,26.0],"size":[12.0,8.0,8.0],"about":"The master on/off switch. It sits directly in the battery's positive line, so switching off cuts power to absolutely everything — a competition tech-check requirement.","mass_g":1.5},{"id":"harness","part":"harness-allowance","kind":"wiring","pos":[-20.0,0.0,12.0],"size":[12.0,12.0,6.0],"about":"Not a real component — a budgeted mass allowance for the wiring loom itself, until robowire derives the true figure from wire gauges and lengths.","mass_g":4.0},{"id":"tof_down_l","part":"vl53l0x-breakout","kind":"tof","pos":[5.0,35.0,8.0],"size":[14.0,10.0,4.0],"about":"A floor sensor: a tiny downward-pointing laser rangefinder. When the floor suddenly reads far away, the robot is about to drive off the edge — this is the failsafe's eyes.","mass_g":1.0},{"id":"tof_down_r","part":"vl53l0x-breakout","kind":"tof","pos":[5.0,-35.0,8.0],"size":[14.0,10.0,4.0],"about":"A floor sensor: a tiny downward-pointing laser rangefinder. When the floor suddenly reads far away, the robot is about to drive off the edge — this is the failsafe's eyes.","mass_g":1.0},{"id":"imu","part":"imu-icm42688","kind":"imu","pos":[-25.0,0.0,22.0],"size":[13.0,13.0,4.0],"about":"The motion sensor. It measures acceleration and rotation so the brain knows how the robot is actually moving — the foundation of braking and flip detection.","mass_g":1.0},{"id":"motor_l","part":"n20-motor-6v","kind":"motor","pos":[-35.0,25.2,16.0],"size":[15.0,11.0,11.0],"about":"A geared drive motor. It spins one wheel: drive both motors the same way to go straight, opposite ways to spin on the spot.","mass_g":9.0},{"id":"motor_r","part":"n20-motor-6v","kind":"motor","pos":[-35.0,-25.2,16.0],"size":[15.0,11.0,11.0],"about":"A geared drive motor. It spins one wheel: drive both motors the same way to go straight, opposite ways to spin on the spot.","mass_g":9.0}],"cones":[{"apex":[5.0,35.0,8.0],"dir":[0.0,0.0,-1.0],"half_angle_deg":12.5,"length":8.0,"label":"tof_down_l"},{"apex":[5.0,-35.0,8.0],"dir":[0.0,0.0,-1.0],"half_angle_deg":12.5,"length":8.0,"label":"tof_down_r"}],"cog":[-12.330503425391491,0.29721985898545156,11.2478532419728],"support":[[-35.0,-42.0],[45.0,-40.0],[45.0,40.0],[-35.0,42.0]],"tip":{"edge":"rear","distance_mm":22.66949657460851,"angle_deg":63.61091564284754,"energy_mj":13.915808393287811},"cube_mm":101.6,"cube_fit":true,"bbox":[95.0,95.0,32.0],"ledger":[{"k":"total mass","v":"100.9 g of 150 g","verdict":"ok"},{"k":"budget margin","v":"49.1 g","verdict":"ok"},{"k":"mass split","v":"chassis 41.9 g · parts 59.0 g","verdict":""},{"k":"CoG","v":"(-12.3, 0.3, 11.2) mm","verdict":""},{"k":"yaw inertia","v":"91314 g·mm²","verdict":""},{"k":"cube fit","v":"95.0 × 95.0 × 32.0 mm — FITS","verdict":"ok"},{"k":"worst tip edge","v":"rear · 22.7 mm · 63.6° · 13.92 mJ","verdict":"ok"},{"k":"brake pitch limit","v":"50.0 m/s²","verdict":""}],"checks":[{"code":"D01","desc":"cube fit (bbox vs 101.6mm)","pass":true,"detail":"bbox 95.0 x 95.0 x 32.0 mm"},{"code":"D02","desc":"mass within class limit","pass":true,"detail":"100.9 g of 150 g"},{"code":"D05","desc":"wheel-chassis containment","pass":true,"detail":"all wheels within footprint"},{"code":"X03","desc":"derivation rule: no hand-entered derivables","pass":true,"detail":"all mass/CoG/inertia/geometry quantities computed by this pipeline"}]};
+
+(function () {
+  "use strict";
+  const cv = document.getElementById("scene");
+  const cx = cv.getContext("2d");
+
+  document.getElementById("name").textContent = SCENE.name + " " + SCENE.revision;
+  document.getElementById("hash").textContent =
+    "robot " + SCENE.robot_hash.slice(0, 16) + " · body " + SCENE.body_hash.slice(0, 16);
+  document.getElementById("sub").textContent =
+    SCENE.pipeline + " — every number derived, none declared";
+
+  // ---- camera --------------------------------------------------------------
+  let yaw = -0.7, pitch = 0.45, dist = 300, dpr = 1;
+  const center = [0, 0, 16];
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    cv.width = innerWidth * dpr;
+    cv.height = innerHeight * dpr;
+  }
+  function project(p) {
+    const dx = p[0] - center[0], dy = p[1] - center[1], dz = p[2] - center[2];
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const x1 = dx * cy - dy * sy, y1 = dx * sy + dy * cy;
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const y2 = y1 * cp - dz * sp;
+    const z2 = y1 * sp + dz * cp;
+    const depth = dist + y2;
+    if (depth < 10) return null;
+    const f = 900 * dpr / depth;
+    return [cv.width / 2 + x1 * f, cv.height / 2 - z2 * f];
+  }
+  function line3(a, b, color, width, dash) {
+    const p = project(a), q = project(b);
+    if (!p || !q) return;
+    cx.beginPath(); cx.moveTo(p[0], p[1]); cx.lineTo(q[0], q[1]);
+    cx.strokeStyle = color; cx.lineWidth = width * dpr;
+    cx.setLineDash(dash ? [5 * dpr, 4 * dpr] : []);
+    cx.stroke(); cx.setLineDash([]);
+  }
+  function poly3(pts, color, width, closed, dash) {
+    for (let i = 0; i + 1 < pts.length; i++) line3(pts[i], pts[i + 1], color, width, dash);
+    if (closed && pts.length > 2) line3(pts[pts.length - 1], pts[0], color, width, dash);
+  }
+
+  // ---- layers ---------------------------------------------------------------
+  const LAYERS = [
+    ["chassis", "chassis"], ["wheels", "wheels + skids"], ["components", "components"],
+    ["cones", "sensor cones"], ["cog", "CoG + drop line"], ["support", "support polygon + tip edge"],
+    ["cube", "101.6mm cube ghost"],
+  ];
+  const on = {};
+  const layersEl = document.getElementById("layers");
+  for (const [id, label] of LAYERS) {
+    on[id] = true;
+    const lab = document.createElement("label");
+    const inp = document.createElement("input");
+    inp.type = "checkbox"; inp.checked = true;
+    inp.addEventListener("change", () => { on[id] = inp.checked; draw(); });
+    lab.append(inp, document.createTextNode(label));
+    layersEl.appendChild(lab);
+  }
+
+  // ---- ledger ---------------------------------------------------------------
+  const ledger = document.getElementById("ledger");
+  let html = "<h2>derived ledger</h2>";
+  for (const r of SCENE.ledger) {
+    html += `<div class="lrow ${r.verdict}"><span class="k">${r.k}</span><span class="v">${r.v}</span></div>`;
+  }
+  html += "<h2 style='margin-top:10px'>checks</h2>";
+  for (const c of SCENE.checks) {
+    const col = c.pass ? "var(--ok)" : "var(--bad)";
+    html += `<div class="check"><span class="pill" style="background:${col}">${c.pass ? "PASS" : "FAIL"}</span>` +
+      `<span>${c.code}</span><span class="d">${c.detail}</span></div>`;
+  }
+  ledger.innerHTML = html;
+
+  // ---- drawing ---------------------------------------------------------------
+  function boxEdges(pos, size) {
+    const [l, w, h] = size.map(v => v / 2);
+    const c = [];
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1])
+      c.push([pos[0] + sx * l, pos[1] + sy * w, pos[2] + sz * h]);
+    return [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]]
+      .map(([a, b]) => [c[a], c[b]]);
+  }
+
+  function draw() {
+    cx.clearRect(0, 0, cv.width, cv.height);
+    // floor grid
+    cx.globalAlpha = 0.3;
+    for (let g = -80; g <= 80; g += 20) {
+      line3([g, -80, 0], [g, 80, 0], "#1d262c", 1, false);
+      line3([-80, g, 0], [80, g, 0], "#1d262c", 1, false);
+    }
+    cx.globalAlpha = 1;
+
+    if (on.chassis) {
+      const hw = SCENE.chassis.half_width, prof = SCENE.chassis.profile;
+      for (const s of [-1, 1]) {
+        poly3(prof.map(v => [v[0], s * hw, v[1]]), "#3d4a52", 1.4, true, false);
+      }
+      for (const v of prof) line3([v[0], -hw, v[1]], [v[0], hw, v[1]], "#3d4a52", 1.4, false);
+    }
+    if (on.wheels) {
+      for (const w of SCENE.wheels) {
+        const ring = [];
+        for (let a = 0; a <= 24; a++) {
+          const t = a / 24 * Math.PI * 2;
+          ring.push([w.pos[0] + w.radius * Math.cos(t), w.pos[1], w.pos[2] + w.radius * Math.sin(t)]);
+        }
+        poly3(ring, "#5a6870", 1.4, false, false);
+      }
+    }
+    if (on.cube) {
+      const c = SCENE.cube_mm, hz = c / 2;
+      const col = SCENE.cube_fit ? "#57b48f" : "#e05c50";
+      cx.globalAlpha = 0.55;
+      for (const e of boxEdges([0, 0, hz], [c, c, c])) line3(e[0], e[1], col, 1, true);
+      cx.globalAlpha = 1;
+    }
+    if (on.support) {
+      const pts = SCENE.support.map(p => [p[0], p[1], 0.5]);
+      poly3(pts, "#4f9dd6", 1.6, true, false);
+      // worst tip edge highlighted: recompute min-distance edge in-view (a
+      // deliberate display-side cross-check of the record's label).
+      let worst = null, wd = Infinity;
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        const d = distPointSeg(SCENE.cog, a, b);
+        if (d < wd) { wd = d; worst = [a, b]; }
+      }
+      if (worst) {
+        line3(worst[0], worst[1], "#e05c50", 3, false);
+        const mid = [(worst[0][0]+worst[1][0])/2, (worst[0][1]+worst[1][1])/2, 2];
+        label(mid, `tip: ${SCENE.tip.edge} ${SCENE.tip.distance_mm.toFixed(1)}mm / ${SCENE.tip.angle_deg.toFixed(0)}°`, "#e05c50");
+      }
+    }
+    if (on.cones) {
+      for (const c of SCENE.cones) {
+        const r = Math.tan(c.half_angle_deg * Math.PI / 180) * c.length;
+        const end = [c.apex[0] + c.dir[0] * c.length, c.apex[1] + c.dir[1] * c.length, c.apex[2] + c.dir[2] * c.length];
+        // ring basis perpendicular to dir
+        let u = [1, 0, 0];
+        if (Math.abs(c.dir[0]) > 0.9) u = [0, 1, 0];
+        const v1 = normo(cross(c.dir, u));
+        const v2 = normo(cross(c.dir, v1));
+        const ring = [];
+        for (let a = 0; a <= 20; a++) {
+          const t = a / 20 * Math.PI * 2;
+          ring.push([
+            end[0] + r * (v1[0] * Math.cos(t) + v2[0] * Math.sin(t)),
+            end[1] + r * (v1[1] * Math.cos(t) + v2[1] * Math.sin(t)),
+            end[2] + r * (v1[2] * Math.cos(t) + v2[2] * Math.sin(t)),
+          ]);
+        }
+        cx.globalAlpha = 0.8;
+        poly3(ring, "#57b48f", 1.2, false, false);
+        for (let k = 0; k < 20; k += 5) line3(c.apex, ring[k], "#57b48f", 1, false);
+        cx.globalAlpha = 1;
+        label(end, c.label, "#57b48f");
+      }
+    }
+    if (on.components) {
+      for (const n of SCENE.nodes) {
+        const selCol = sel === n.id ? "#e8a33d" : "#77848c";
+        for (const e of boxEdges(n.pos, n.size)) line3(e[0], e[1], selCol, 1.2, false);
+        label([n.pos[0], n.pos[1], n.pos[2] + n.size[2] / 2 + 5], n.id, sel === n.id ? "#e8a33d" : "#c7ced2");
+      }
+    }
+    if (on.cog) {
+      const q = project(SCENE.cog);
+      if (q) {
+        cx.beginPath(); cx.arc(q[0], q[1], 5 * dpr, 0, Math.PI * 2);
+        cx.fillStyle = "#e8a33d"; cx.shadowColor = "#e8a33d"; cx.shadowBlur = 12 * dpr;
+        cx.fill(); cx.shadowBlur = 0;
+      }
+      line3(SCENE.cog, [SCENE.cog[0], SCENE.cog[1], 0], "#e8a33d", 1.2, true);
+      label([SCENE.cog[0], SCENE.cog[1], SCENE.cog[2] + 8],
+        `CoG z=${SCENE.cog[2].toFixed(1)}mm`, "#e8a33d");
+    }
+  }
+  function label(p, text, color) {
+    const q = project(p);
+    if (!q) return;
+    cx.fillStyle = color;
+    cx.font = `${10.5 * dpr}px ui-monospace, Menlo, monospace`;
+    cx.fillText(text, q[0] + 4 * dpr, q[1] - 3 * dpr);
+  }
+  function cross(a, b) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+  function normo(v) { const n = Math.hypot(...v) || 1; return v.map(x => x / n); }
+  function distPointSeg(p, a, b) {
+    const ab = [b[0]-a[0], b[1]-a[1]], ap = [p[0]-a[0], p[1]-a[1]];
+    const len2 = ab[0]*ab[0]+ab[1]*ab[1];
+    const t = len2 ? Math.max(0, Math.min(1, (ap[0]*ab[0]+ap[1]*ab[1]) / len2)) : 0;
+    return Math.hypot(ap[0]-t*ab[0], ap[1]-t*ab[1]);
+  }
+
+  // ---- interaction -----------------------------------------------------------
+  let dragging = false, lx = 0, ly = 0, sel = null;
+  cv.addEventListener("pointerdown", e => {
+    dragging = true; lx = e.clientX; ly = e.clientY;
+    cv.classList.add("dragging"); cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointerup", e => {
+    dragging = false; cv.classList.remove("dragging");
+    if (Math.hypot(e.clientX - lx, e.clientY - ly) < 4) {
+      let best = null, bd = 26 * dpr;
+      for (const n of SCENE.nodes) {
+        const q = project(n.pos);
+        if (!q) continue;
+        const d = Math.hypot(e.clientX * dpr - q[0], e.clientY * dpr - q[1]);
+        if (d < bd) { bd = d; best = n; }
+      }
+      sel = best && sel !== best.id ? best.id : null;
+      renderDossier(best && sel ? best : null);
+      draw();
+    }
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    yaw += (e.clientX - lx) * 0.008;
+    pitch = Math.max(0.05, Math.min(1.45, pitch + (e.clientY - ly) * 0.006));
+    lx = e.clientX; ly = e.clientY;
+    draw();
+  });
+  cv.addEventListener("wheel", e => {
+    e.preventDefault();
+    dist = Math.max(120, Math.min(800, dist * (1 + e.deltaY * 0.001)));
+    draw();
+  }, { passive: false });
+  window.addEventListener("keydown", e => {
+    if (e.key === "Escape") { sel = null; renderDossier(null); draw(); }
+  });
+
+  const dossier = document.getElementById("dossier");
+  function renderDossier(n) {
+    if (!n) { dossier.style.display = "none"; return; }
+    dossier.style.display = "block";
+    dossier.innerHTML =
+      `<button class="close" onclick="this.parentElement.style.display='none'">close</button>` +
+      `<h3>${n.id}</h3><div class="about">${n.about || "(no description)"}</div>` +
+      `<div class="meta">${n.part} · ${n.kind} · ${n.mass_g} g · at (${n.pos.map(v => v.toFixed(0)).join(", ")}) mm</div>`;
+  }
+
+  window.addEventListener("resize", () => { resize(); draw(); });
+  resize();
+  draw();
+})();
+</script>
+</body>
+</html>

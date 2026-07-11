@@ -9,10 +9,39 @@ fn die(msg: &str) -> ! {
     std::process::exit(2)
 }
 
+fn cmd_view(args: &[String]) {
+    let flag = |name: &str| {
+        args.iter()
+            .position(|a| a == name)
+            .and_then(|i| args.get(i + 1).cloned())
+    };
+    let robot_path = PathBuf::from(&args[0]);
+    let parts_dir = PathBuf::from(flag("--parts").unwrap_or_else(|| "parts".into()));
+    let spec: RobotSpec = serde_json::from_slice(
+        &std::fs::read(&robot_path).unwrap_or_else(|e| die(&format!("{robot_path:?}: {e}"))),
+    )
+    .unwrap_or_else(|e| die(&format!("parse {robot_path:?}: {e}")));
+    let cat = Catalogue::load(&parts_dir).unwrap_or_else(|e| die(&e));
+    let d = derive(&spec, &cat).unwrap_or_else(|e| die(&e));
+    let html = robotspec::view::build_inspector(&spec, &cat, &d).unwrap_or_else(|e| die(&e));
+    let out = flag("--out").unwrap_or_else(|| format!("{}-inspector.html", spec.identity.name));
+    std::fs::write(&out, html).unwrap_or_else(|e| die(&format!("writing {out}: {e}")));
+    println!("wrote {out}   robot {}", &d.robot_hash[..16]);
+    if !args.iter().any(|a| a == "--no-open") {
+        let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+        if let Err(e) = std::process::Command::new(opener).arg(&out).spawn() {
+            eprintln!("could not launch browser ({e}); open {out} manually");
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(|s| s.as_str()) == Some("view") && args.len() >= 2 {
+        return cmd_view(&args[1..]);
+    }
     if args.first().map(|s| s.as_str()) != Some("show") || args.len() < 2 {
-        eprintln!("usage: robotspec show <robot.json> [--parts DIR] [--out derived.json]");
+        eprintln!("usage: robotspec <show|view> <robot.json> [--parts DIR] [--out FILE]");
         std::process::exit(2);
     }
     let robot_path = PathBuf::from(&args[1]);

@@ -59,6 +59,9 @@ pub struct Part {
     pub provisional: bool,
     #[serde(default)]
     pub notes: String,
+    /// Plain-English "what this is" (shared prose with robowire's view).
+    #[serde(default)]
+    pub description: String,
 }
 
 pub struct Catalogue {

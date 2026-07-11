@@ -30,14 +30,14 @@ cell80 (external companion spec).
   is a Phase 1 chore).
 - **Six specs banked** ✅ — amended, cross-referenced, E/D/X code registry seeded.
 
-## Phase 1 — close M1, start the electrical truth (now)
+## Phase 1 — close M1, start the electrical truth ✅ (completed 2026-07-11)
 
 | Item | Owner spec | Gate |
 |---|---|---|
 | ✅ Edge bench §4.5 on the dynamic plant, against the BOUND robot | chuk-arena M1 | **done 2026-07-11:** 0/200 certified losses across the μ band (unprotected 200/200 — pressure confirmed); known limitation: worst-case boundary intrusion to 13mm CoG-to-edge via veto-state scrub drift, watched for §4.7 |
 | ✅ robowire M0 + schematic + 3D harness view w/ inspector | robowire M0 | **done:** HARNESS LEGAL, planted faults fail with correct E-codes |
-| RobotSpec M0: schema v0.1 freeze, parametric mode (✅ hashed robot + arena episode citing it; ⏳ viewer prototype into repo) | robotspec M0 | MVP wedge exists as a hashed RobotSpec cited by inspector + first arena episode |
-| Viewer prototype into repo (`robotspec-viewer/`) | robotspec-viewer | file lands, provisional flag on its private derivation copy |
+| ✅ RobotSpec M0: schema v0.1, parametric mode, hashed robot cited by arena episode AND inspector | robotspec M0 | **done 2026-07-11:** robot_hash in the §4.5 report and in the inspector HUD |
+| ✅ Inspector in repo (`robotspec view`) — built to spec, superseding the prototype import: displays the record computed by robotspec::derive itself (viewer M1 "one derivation codebase" met by construction; no private copy ever existed in-repo) | robotspec-viewer M0+M1(partial) | hash in HUD; ledger = pipeline output; prototype import now optional |
 
 ## Phase 2 — organs share one truth
 

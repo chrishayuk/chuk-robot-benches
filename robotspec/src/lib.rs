@@ -13,6 +13,7 @@ pub mod derive;
 pub mod geom;
 pub mod identity;
 pub mod schema;
+pub mod view;
 
 pub const ROBOTSPEC_VERSION: &str = "0.1.0-m0";
 pub const SCHEMA_VERSION: &str = "robotspec-v0.1";
