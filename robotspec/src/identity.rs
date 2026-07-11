@@ -4,15 +4,7 @@ use crate::schema::RobotSpec;
 use crate::SCHEMA_VERSION;
 use std::collections::BTreeMap;
 
-pub fn sha256_hex(bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let d = Sha256::digest(bytes);
-    let mut s = String::with_capacity(64);
-    for b in d {
-        s.push_str(&format!("{:02x}", b));
-    }
-    s
-}
+pub use roboparts::sha256_hex;
 
 /// body_hash covers everything physical; robot_hash = body + models + kernel.
 /// Kernel-only changes keep body_hash stable ("same body, different brain").
