@@ -326,6 +326,50 @@ pub fn e21_bus_voltage(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult,
     Ok(ok(C, D, "all bus devices in the master's voltage domain".into()))
 }
 
+/// E33: every LED must see a series current limiter — a bare LED across a
+/// rail (or a GPIO) is a statically detectable dead part. Registered in
+/// specs/codes.md before this function existed, per bugs-become-rules.
+pub fn e33_led_current_limit(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult, String> {
+    const C: &str = "E33";
+    const D: &str = "LEDs have series current limiting";
+    for (inst, part_id) in &nl.instances {
+        let (part, _) = cat.get(part_id)?;
+        if part.kind != "led" {
+            continue;
+        }
+        let prefix = format!("{inst}.");
+        let mut wired = false;
+        let mut limited = false;
+        for net in &nl.nets {
+            if !net.pins.iter().any(|p| p.starts_with(&prefix)) {
+                continue;
+            }
+            wired = true;
+            for p in &net.pins {
+                let (other_inst, _) = split_pin(p)?;
+                if other_inst == inst {
+                    continue;
+                }
+                let other_part = nl
+                    .instances
+                    .get(other_inst)
+                    .and_then(|pid| cat.get(pid).ok());
+                if other_part.map_or(false, |(op, _)| op.kind == "resistor") {
+                    limited = true;
+                }
+            }
+        }
+        if wired && !limited {
+            return Ok(fail(
+                C,
+                D,
+                format!("{inst}: no resistor on either side — it will burn on first power"),
+            ));
+        }
+    }
+    Ok(ok(C, D, "all wired LEDs are current-limited".into()))
+}
+
 /// E40: a switch interrupts the main power path.
 pub fn e40_power_switch(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult, String> {
     const C: &str = "E40";
@@ -406,6 +450,7 @@ pub fn run_checks(nl: &Netlist, cat: &ElecCatalogue) -> Result<Vec<CheckResult>,
         e11_pin_double_booking(nl, cat)?,
         e20_i2c_addresses(nl, cat)?,
         e21_bus_voltage(nl, cat)?,
+        e33_led_current_limit(nl, cat)?,
         e40_power_switch(nl, cat)?,
         e41_failsafe_chain(nl, cat)?,
     ])

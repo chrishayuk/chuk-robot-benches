@@ -114,3 +114,39 @@ fn planted_unwired_xshut_fails_e20() {
         "E20 must require a wired XSHUT for the reassignment recipe"
     );
 }
+
+#[test]
+fn planted_bare_led_fails_e33() {
+    let (mut nl, cat) = load();
+    // An LED wired straight across the 3V3 rail and ground — no resistor.
+    nl.instances.insert("led1".into(), "led-red-5mm".into());
+    for net in nl.nets.iter_mut() {
+        if net.id == "v33" {
+            net.pins.push("led1.A".into());
+        }
+        if net.id == "gnd" {
+            net.pins.push("led1.K".into());
+        }
+    }
+    assert!(!code_result(&nl, &cat, "E33"), "E33 must catch the bare LED");
+
+    // Same LED with a series resistor: rail -> R -> LED -> gnd. Legal.
+    let (mut nl, cat) = load();
+    nl.instances.insert("led1".into(), "led-red-5mm".into());
+    nl.instances.insert("r1".into(), "resistor-330r".into());
+    for net in nl.nets.iter_mut() {
+        if net.id == "v33" {
+            net.pins.push("r1.P1".into());
+        }
+        if net.id == "gnd" {
+            net.pins.push("led1.K".into());
+        }
+    }
+    nl.nets.push(robowire::schema::Net {
+        id: "led_feed".into(),
+        pins: vec!["r1.P2".into(), "led1.A".into()],
+        volts: None,
+        signal: None,
+    });
+    assert!(code_result(&nl, &cat, "E33"), "resistor in series must satisfy E33");
+}

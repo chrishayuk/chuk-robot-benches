@@ -1,0 +1,14 @@
+{
+  "id": "buzzer-active-5v",
+  "kind": "buzzer",
+  "mass_g": 1.5,
+  "provisional": true,
+  "notes": "active piezo, ~30mA",
+  "description": "An active buzzer: give it 5V and it screams — the classic 'robot is alive / battery is dying' indicator. Polarity matters.",
+  "elec": {
+    "pins": {
+      "+": { "role": "power_in", "v_range": [3.0, 5.5], "required": true },
+      "-": { "role": "gnd", "required": true }
+    }
+  }
+}

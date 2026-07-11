@@ -105,7 +105,8 @@
 <div id="left">
   <h2>layers</h2>
   <div id="layerToggles"></div>
-  <h2>parts catalogue — click to place</h2>
+  <h2>parts catalogue — drag onto the board</h2>
+  <input id="partFilter" placeholder="filter parts…" style="width:100%;margin-bottom:6px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:11px ui-monospace,Menlo,monospace">
   <div id="palette"></div>
 </div>
 <canvas id="board"></canvas>
@@ -231,6 +232,7 @@ const WASM_B64 =
   }
 
   let mode = "2d";
+  let wireDrag = null;      // {from, cur:[x,y], moved} while dragging a wire
   let yaw = -0.7, pitch = 0.5, dist = 900;
   let orbiting = false;
   const KIND_H = { battery: 30, esc: 16, mcu: 12, motor: 26, switch: 14, tof: 10, imu: 10, radio: 10, wiring: 8 };
@@ -396,7 +398,10 @@ const WASM_B64 =
     compHd.style.cssText = "color:var(--dim);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;margin:8px 0 2px";
     compHd.textContent = "components";
     el.appendChild(compHd);
-    for (const [k, label] of Object.entries(KIND_LABELS)) {
+    const presentKinds = [...new Set(PARTS.filter(p => p.elec && Object.keys(p.elec.pins || {}).length).map(p => p.kind))];
+    for (const k of presentKinds) {
+      const label = KIND_LABELS[k] || k;
+      if (kindOn[k] === undefined) kindOn[k] = true;
       const lab = document.createElement("label");
       lab.className = "ck";
       const inp = document.createElement("input");
@@ -561,6 +566,19 @@ const WASM_B64 =
     }
   }
 
+  function createNet(a, b) {
+    const net = { id: autoNetId(a, b), pins: [a, b] };
+    const d1 = decl(a), d2 = decl(b);
+    const src = [d1, d2].find(d => d && (d.role === "power_out"));
+    if (src) net.volts = src.volts;
+    else if ([d1, d2].some(d => d && d.role === "pos")) net.volts = 7.4;
+    const sig = [d1, d2].find(d => d && d.signal);
+    if (!net.volts && sig) net.signal = sig.signal === "crsf" ? "uart" : sig.signal;
+    nl.nets.push(net);
+    selNet = nl.nets.length - 1;
+    selInst = null;
+  }
+
   function removeInstance(inst) {
     delete nl.instances[inst];
     delete layout[inst];
@@ -663,7 +681,16 @@ const WASM_B64 =
       }
     }
     // pending wire rubber band hint
-    hint(pending ? `wiring from ${pending} — click another pin (esc cancels)` :
+    if (wireDrag && wireDrag.moved) {
+      const sp = pinXY(wireDrag.from);
+      if (sp) {
+        cx.strokeStyle = "#e8a33d"; cx.lineWidth = 1.6; cx.setLineDash([6, 4]);
+        cx.beginPath(); cx.moveTo(sp[0], sp[1]); cx.lineTo(wireDrag.cur[0], wireDrag.cur[1]); cx.stroke();
+        cx.setLineDash([]);
+      }
+    }
+    hint(wireDrag && wireDrag.moved ? `release on a pin to connect ${wireDrag.from}` :
+      pending ? `wiring from ${pending} — click another pin, or drag from a pin (esc cancels)` :
       pickHandler ? "pick a pin…" :
       selInst ? `${selInst} selected — drag to move, ✕ or Delete to remove` :
       selNet >= 0 ? "net selected — Delete removes it" : "");
@@ -734,7 +761,17 @@ const WASM_B64 =
         cx.beginPath(); cx.arc(q2[0], q2[1], active ? 5 : 3, 0, Math.PI * 2); cx.fill();
       }
     }
-    hint(pending ? `wiring from ${pending} — click another pin (esc cancels)` :
+    if (wireDrag && wireDrag.moved) {
+      const wp = pin3(wireDrag.from);
+      const sp = wp && project3(wp);
+      if (sp) {
+        cx.strokeStyle = "#e8a33d"; cx.lineWidth = 1.6; cx.setLineDash([6, 4]);
+        cx.beginPath(); cx.moveTo(sp[0], sp[1]); cx.lineTo(wireDrag.cur[0], wireDrag.cur[1]); cx.stroke();
+        cx.setLineDash([]);
+      }
+    }
+    hint(wireDrag && wireDrag.moved ? `release on a pin to connect ${wireDrag.from}` :
+      pending ? `wiring from ${pending} — click another pin, or drag from a pin (esc cancels)` :
       pickHandler ? "pick a pin…" :
       "3D — drag empty space to orbit, wheel to zoom; switch to 2D to rearrange");
   }
@@ -783,21 +820,12 @@ const WASM_B64 =
     const pin = pinAt(mx, my);
     if (pin) {
       if (pickHandler) { const h = pickHandler; pickHandler = null; h(pin); refresh(); return; }
-      if (!pending) { pending = pin; }
-      else if (pending !== pin) {
-        const net = { id: autoNetId(pending, pin), pins: [pending, pin] };
-        const d1 = decl(pending), d2 = decl(pin);
-        const src = [d1, d2].find(d => d && (d.role === "power_out"));
-        if (src) net.volts = src.volts;
-        else if ([d1, d2].some(d => d && d.role === "pos")) net.volts = 7.4;
-        const sig = [d1, d2].find(d => d && d.signal);
-        if (!net.volts && sig) net.signal = sig.signal === "crsf" ? "uart" : sig.signal;
-        nl.nets.push(net);
-        selNet = nl.nets.length - 1;
-        pending = null;
-        refresh(); return;
-      } else pending = null;
-      draw(); return;
+      // Press starts a potential drag-wire; release decides (drag onto a
+      // pin to connect, or a plain click for the click-click flow).
+      wireDrag = { from: pin, cur: [mx, my], moved: false };
+      cv.setPointerCapture(e.pointerId);
+      draw();
+      return;
     }
     // removal badge on the selected box? (2D only; Delete works everywhere)
     if (mode === "2d" && selInst && layout[selInst]) {
@@ -837,6 +865,15 @@ const WASM_B64 =
     renderNets(); renderSelInfo(); draw();
   });
   cv.addEventListener("pointermove", e => {
+    if (wireDrag) {
+      wireDrag.cur = [e.offsetX, e.offsetY];
+      if (!wireDrag.moved) {
+        const sp = mode === "3d" ? (pin3(wireDrag.from) && project3(pin3(wireDrag.from))) : pinXY(wireDrag.from);
+        if (sp && Math.hypot(e.offsetX - sp[0], e.offsetY - sp[1]) > 7) wireDrag.moved = true;
+      }
+      draw();
+      return;
+    }
     if (orbiting) {
       yaw += (e.offsetX - lastXY[0]) * 0.008;
       pitch = Math.max(0.05, Math.min(1.45, pitch + (e.offsetY - lastXY[1]) * 0.006));
@@ -856,7 +893,23 @@ const WASM_B64 =
       : wireAt(mx, my) >= 0 ? "pointer"
       : instAt(mx, my) ? "move" : "default";
   });
-  cv.addEventListener("pointerup", () => {
+  cv.addEventListener("pointerup", e => {
+    if (wireDrag) {
+      const target = pinAt(e.offsetX, e.offsetY);
+      if (wireDrag.moved && target && target !== wireDrag.from) {
+        createNet(wireDrag.from, target);
+        pending = null; wireDrag = null;
+        refresh(); return;
+      }
+      if (!wireDrag.moved) {
+        const pin = wireDrag.from;
+        if (!pending) pending = pin;
+        else if (pending !== pin) { createNet(pending, pin); pending = null; wireDrag = null; refresh(); return; }
+        else pending = null;
+      }
+      wireDrag = null;
+      draw(); return;
+    }
     if (dragInst) { dragInst = null; saveLayout(); }
     if (orbiting) { orbiting = false; cv.classList.remove("dragging"); }
   });
@@ -889,7 +942,7 @@ const WASM_B64 =
   window.addEventListener("keydown", e => {
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-    if (e.key === "Escape") { pending = null; pickHandler = null; selInst = null; selNet = -1; renderNets(); renderSelInfo(); draw(); hint(""); }
+    if (e.key === "Escape") { pending = null; pickHandler = null; wireDrag = null; selInst = null; selNet = -1; renderNets(); renderSelInfo(); draw(); hint(""); }
     if ((e.key === "Delete" || e.key === "Backspace")) {
       if (selNet >= 0) { nl.nets.splice(selNet, 1); selNet = -1; refresh(); }
       else if (selInst) { removeInstance(selInst); refresh(); }
@@ -917,10 +970,36 @@ const WASM_B64 =
     return cand;
   }
 
+  const PART_GROUPS = [
+    ["power", ["battery", "switch"]],
+    ["drive", ["esc", "motor"]],
+    ["brain", ["mcu"]],
+    ["sensors", ["tof", "imu"]],
+    ["radio", ["radio"]],
+    ["indicators & passives", ["led", "buzzer", "resistor", "button"]],
+  ];
   function renderPalette() {
     const el = document.getElementById("palette");
     el.innerHTML = "";
-    for (const p of PARTS) {
+    const q = (document.getElementById("partFilter").value || "").toLowerCase();
+    const electrical = PARTS.filter(p => p.elec && Object.keys(p.elec.pins || {}).length);
+    const grouped = new Set();
+    const matches = p => !q || p.id.includes(q) || p.kind.includes(q) || (p.description || "").toLowerCase().includes(q);
+    const renderGroup = (label, parts) => {
+      if (!parts.length) return;
+      const hd = document.createElement("div");
+      hd.style.cssText = "color:var(--dim);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;margin:8px 0 3px";
+      hd.textContent = label;
+      el.appendChild(hd);
+      for (const p of parts) renderCard(p);
+    };
+    for (const [label, kinds] of PART_GROUPS) {
+      const parts = electrical.filter(p => kinds.includes(p.kind) && matches(p));
+      parts.forEach(p => grouped.add(p.id));
+      renderGroup(label, parts);
+    }
+    renderGroup("other", electrical.filter(p => !grouped.has(p.id) && matches(p)));
+    function renderCard(p) {
       const div = document.createElement("div");
       div.className = "part";
       div.innerHTML = `<span>${p.id}<br><span class="k">${p.kind}</span></span>`;
@@ -937,6 +1016,7 @@ const WASM_B64 =
       el.appendChild(div);
     }
   }
+  document.getElementById("partFilter").addEventListener("input", renderPalette);
 
   function renderNets() {
     const el = document.getElementById("nets");

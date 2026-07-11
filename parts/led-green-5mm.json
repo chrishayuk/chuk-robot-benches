@@ -1,0 +1,14 @@
+{
+  "id": "led-green-5mm",
+  "kind": "led",
+  "mass_g": 0.3,
+  "provisional": true,
+  "notes": "forward ~2.2V @ 20mA",
+  "description": "A green indicator light — same rules as its red sibling: anode in, cathode out, and always a series resistor.",
+  "elec": {
+    "pins": {
+      "A": { "role": "diode_a", "required": true },
+      "K": { "role": "diode_k", "required": true }
+    }
+  }
+}

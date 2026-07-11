@@ -21,6 +21,7 @@ here first, then a check in the owning tool. Codes are never renumbered or reuse
 | E30 | per-rail worst-case draw vs source capability (C-rating, regulator) | fail |
 | E31 | wire gauge / connector rating vs worst-case segment current | fail |
 | E32 | brownout topology — MCU rail exposure to motor-stall sag | warn |
+| E33 | LED without series current limiting (neither adjacent net contains a resistor) | fail |
 | E40 | switch/removable link in main power path, reachable (tech-check) | fail |
 | E41 | failsafe stop chain declared and complete | fail |
 | E42 | exposed-conductor on high-current nets without insulation class | warn |

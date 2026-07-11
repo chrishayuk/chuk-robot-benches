@@ -1,0 +1,14 @@
+{
+  "id": "led-red-5mm",
+  "kind": "led",
+  "mass_g": 0.3,
+  "provisional": true,
+  "notes": "forward ~2.0V @ 20mA",
+  "description": "A red indicator light. Current flows in through the long leg (anode) and out the short leg (cathode) — and it MUST have a resistor in series, or it burns out the instant power arrives.",
+  "elec": {
+    "pins": {
+      "A": { "role": "diode_a", "required": true },
+      "K": { "role": "diode_k", "required": true }
+    }
+  }
+}

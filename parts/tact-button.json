@@ -1,0 +1,14 @@
+{
+  "id": "tact-button",
+  "kind": "button",
+  "mass_g": 0.4,
+  "provisional": true,
+  "notes": "momentary, normally open",
+  "description": "A momentary push button: the two legs connect while pressed. Useful for a boot/pair/test input to the brain.",
+  "elec": {
+    "pins": {
+      "A": { "role": "passive" },
+      "B": { "role": "passive" }
+    }
+  }
+}

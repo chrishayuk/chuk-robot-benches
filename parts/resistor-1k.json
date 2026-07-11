@@ -1,0 +1,14 @@
+{
+  "id": "resistor-1k",
+  "kind": "resistor",
+  "mass_g": 0.2,
+  "provisional": true,
+  "notes": "1k ohm, 1/4W",
+  "description": "A 1000-ohm resistor: dimmer LED current, pull-ups/pull-downs, or gentle signal limiting.",
+  "elec": {
+    "pins": {
+      "P1": { "role": "passive" },
+      "P2": { "role": "passive" }
+    }
+  }
+}
