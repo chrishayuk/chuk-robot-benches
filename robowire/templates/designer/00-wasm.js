@@ -25,6 +25,15 @@
     const out = new Uint8Array(W.memory.buffer, W.out_ptr(), W.out_len());
     return JSON.parse(dec.decode(out));
   }
+  function callExplainError(code) {
+    const cb = enc.encode(code);
+    const p1 = W.wasm_alloc(cb.length);
+    new Uint8Array(W.memory.buffer, p1, cb.length).set(cb);
+    W.explain_error_json(p1, cb.length);
+    W.wasm_free(p1, cb.length);
+    const out = new Uint8Array(W.memory.buffer, W.out_ptr(), W.out_len());
+    return JSON.parse(dec.decode(out));
+  }
   function callRunState(netlistObj, inputsObj) {
     const nl = enc.encode(JSON.stringify(netlistObj));
     const ps = enc.encode(JSON.stringify(PARTS));

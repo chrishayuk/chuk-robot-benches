@@ -104,6 +104,34 @@ pub fn equiv_load_current(part: &ElecPart, v_actual: f64) -> f64 {
     }
 }
 
+/// A fixed-power device's live current draw and (if any) its supply-net
+/// sink — the shared shape behind `equiv_load_current` that every
+/// fixed-power kind (regulator/esc/mcu/radio/buzzer/servo) and every
+/// sensor (tof/imu) uses identically when powered: resolve the `power_in`
+/// net, scale by the actual live voltage there, sink onto that same net if
+/// any current flows. Kept here rather than duplicated in both
+/// `fixed_power` and `sensor` component modules.
+pub fn fixed_power_draw(
+    net_of: &BTreeMap<String, String>,
+    hot: &BTreeSet<String>,
+    resolved_volts: &BTreeMap<String, f64>,
+    elec: &Elec,
+    part: &ElecPart,
+    inst: &str,
+    powered: bool,
+) -> (f64, Option<(String, f64)>) {
+    if !powered {
+        return (0.0, None);
+    }
+    let Some(supply_net) = pin_net_by_role(elec, inst, net_of, "power_in") else {
+        return (0.0, None);
+    };
+    let v_actual = net_volts_live(resolved_volts, hot, &supply_net);
+    let amps = equiv_load_current(part, v_actual);
+    let sink = if amps > 0.0 { Some((supply_net, amps)) } else { None };
+    (amps, sink)
+}
+
 /// A motor's winding resistance, derived from its catalogue-declared stall
 /// point (`nominal_v / stall_current_a`) — `None` if either figure is
 /// missing or non-positive.

@@ -1,5 +1,5 @@
 //! robowire — the electrical truth, at the command line.
-//!   robowire <check|render|view|design|power> … (see cli.rs per command)
+//!   robowire <check|render|view|design|power|explain|explain-error> … (see cli.rs per command)
 
 mod cli;
 
@@ -22,9 +22,15 @@ fn main() {
     if args.first().map(|s| s.as_str()) == Some("power") && args.len() >= 2 {
         return cmd_power(&args[1..]);
     }
+    if args.first().map(|s| s.as_str()) == Some("explain") && args.len() >= 2 {
+        return cmd_explain(&args[1..]);
+    }
+    if args.first().map(|s| s.as_str()) == Some("explain-error") && args.len() >= 2 {
+        return cmd_explain_error(&args[1..]);
+    }
     if args.first().map(|s| s.as_str()) != Some("check") || args.len() < 2 {
         eprintln!(
-            "usage: robowire <check|render|view|design|power> [netlist.json] [--robot robot.json] [--netlist F] [--parts DIR] [--out FILE]"
+            "usage: robowire <check|render|view|design|power|explain|explain-error> [netlist.json|CODE] [--robot robot.json] [--netlist F] [--parts DIR] [--out FILE]"
         );
         std::process::exit(2);
     }

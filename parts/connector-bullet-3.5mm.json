@@ -1,0 +1,15 @@
+{
+  "id": "connector-bullet-3.5mm",
+  "kind": "connector",
+  "mass_g": 0.4,
+  "provisional": true,
+  "rated_a": 15.0,
+  "notes": "a single 3.5mm bullet connector pair — the usual choice for a motor phase wire (one pair per phase; a brushless motor needs three of these, one per phase, in the real world — this catalogue's simplified 2-wire motor model only needs one to check the equivalent interface).",
+  "description": "A single motor-phase bullet connector, sized to how much continuous current that phase actually carries.",
+  "elec": {
+    "pins": {
+      "P1": { "role": "passive", "required": true },
+      "P2": { "role": "passive", "required": true }
+    }
+  }
+}

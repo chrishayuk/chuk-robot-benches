@@ -1,0 +1,14 @@
+{
+  "name": "02-motor-driver-broken",
+  "instances": { "batt": "lipo-2s-260", "esc": "bbb-dual-esc", "m1": "n20-motor-6v" },
+  "nets": [
+    { "id": "vbat", "pins": ["batt.+", "esc.VIN"], "volts": 7.4 },
+    { "id": "gnd", "pins": ["batt.-", "esc.GND"] },
+    { "id": "m1_a", "pins": ["esc.M1+", "m1.M+"] },
+    { "id": "m1_b", "pins": ["esc.M1-", "m1.M-"] },
+    { "id": "s1_unused", "pins": ["esc.S1"], "signal": "pwm" },
+    { "id": "s2_unused", "pins": ["esc.S2"], "signal": "pwm" }
+  ],
+  "buses": [],
+  "failsafe": null
+}

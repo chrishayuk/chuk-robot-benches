@@ -163,3 +163,33 @@ pub unsafe extern "C" fn describe_json(
     set_out(robowire::prose::describe(&netlist, &cat).to_string());
     0
 }
+
+/// Plain-English what/why/fix teaching content for a check code
+/// (specs/codes.md) — independent of any netlist, the same content
+/// `robowire explain-error <CODE>` prints natively (`robowire::teach`).
+/// Output via out_ptr/len: `{"code","what","why","fix"}` or `{"error"}`.
+/// Returns 0 if the code is known, 1 otherwise.
+///
+/// # Safety
+/// `code_ptr` must reference `code_len` bytes of valid UTF-8.
+#[no_mangle]
+pub unsafe extern "C" fn explain_error_json(code_ptr: *const u8, code_len: usize) -> i32 {
+    let code_bytes = std::slice::from_raw_parts(code_ptr, code_len);
+    let code = match std::str::from_utf8(code_bytes) {
+        Ok(s) => s,
+        Err(e) => {
+            set_out(format!("{{\"error\":{}}}", serde_json::to_string(&format!("code: {e}")).unwrap()));
+            return 1;
+        }
+    };
+    match robowire::teach::explain_error(code) {
+        Some(e) => {
+            set_out(serde_json::json!({ "code": e.code, "what": e.what, "why": e.why, "fix": e.fix }).to_string());
+            0
+        }
+        None => {
+            set_out(format!("{{\"error\":{}}}", serde_json::to_string(&format!("no explanation for '{code}'")).unwrap()));
+            1
+        }
+    }
+}

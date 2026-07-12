@@ -1,13 +1,57 @@
 //! robowire CLI command implementations (split from main.rs per review:
 //! one file per concern; main() is a dispatcher only).
 
-use robowire::catalogue::{sha256_hex, ElecCatalogue};
-use robowire::{run_checks, Netlist};
+use robowire::catalogue::ElecCatalogue;
+use robowire::Netlist;
 use std::path::PathBuf;
 
 pub(crate) fn die(msg: &str) -> ! {
     eprintln!("error: {msg}");
     std::process::exit(2)
+}
+
+pub(crate) fn cmd_explain(args: &[String]) {
+    let flag = |name: &str| {
+        args.iter()
+            .position(|a| a == name)
+            .and_then(|i| args.get(i + 1).cloned())
+    };
+    let path = PathBuf::from(&args[0]);
+    let netlist: Netlist = serde_json::from_slice(
+        &std::fs::read(&path).unwrap_or_else(|e| die(&format!("{path:?}: {e}"))),
+    )
+    .unwrap_or_else(|e| die(&format!("parse: {e}")));
+    let parts_dir = PathBuf::from(flag("--parts").unwrap_or_else(|| "parts".into()));
+    let cat = ElecCatalogue::load(&parts_dir).unwrap_or_else(|e| die(&e));
+
+    println!("{}\n", netlist.name);
+    for net in &netlist.nets {
+        println!("{}", robowire::prose::wire_about(&netlist, &cat, net));
+        for p in &net.pins {
+            let role = robowire::checks::pin_decl(&netlist, &cat, p)
+                .map(|d| robowire::prose::role_text(d))
+                .unwrap_or_default();
+            if role.is_empty() {
+                println!("  {p}");
+            } else {
+                println!("  {p} — {role}");
+            }
+        }
+        println!();
+    }
+}
+
+pub(crate) fn cmd_explain_error(args: &[String]) {
+    let code = args.first().unwrap_or_else(|| die("usage: robowire explain-error <CODE>"));
+    match robowire::teach::explain_error(code) {
+        Some(e) => {
+            println!("{}\n", e.code);
+            println!("WHAT  {}\n", e.what);
+            println!("WHY   {}\n", e.why);
+            println!("FIX   {}", e.fix);
+        }
+        None => die(&format!("no explanation for '{code}' — see specs/codes.md for the registered codes")),
+    }
 }
 
 pub(crate) fn cmd_render(args: &[String]) {
@@ -200,10 +244,32 @@ pub(crate) fn cmd_design(args: &[String]) {
     }
     let examples_json = serde_json::to_string(&examples).unwrap();
 
+    // The progressive teaching curriculum (harness/lessons/*.json) — a
+    // separate directory and embed from the single-issue repair drills
+    // above, since these are one accumulating build, numbered and ordered,
+    // not a flat pile of examples.
+    let lessons_dir = PathBuf::from(flag("--lessons").unwrap_or_else(|| "harness/lessons".into()));
+    let mut lessons = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&lessons_dir) {
+        let mut lesson_paths: Vec<_> = rd
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().map_or(false, |x| x == "json"))
+            .collect();
+        lesson_paths.sort();
+        for path in lesson_paths {
+            if let Ok(v) =
+                serde_json::from_slice::<serde_json::Value>(&std::fs::read(&path).unwrap_or_default())
+            {
+                lessons.push(v);
+            }
+        }
+    }
+    let lessons_json = serde_json::to_string(&lessons).unwrap();
+
     // The designer ships as one self-contained file but is AUTHORED as
     // components: shell + thematic JS modules, assembled here. Edit the
     // modules, never the assembled artifact.
-    const MODULES: [&str; 13] = [
+    const MODULES: [&str; 14] = [
         include_str!("../templates/designer/00-wasm.js"),
         include_str!("../templates/designer/01-state.js"),
         include_str!("../templates/designer/02-prose.js"),
@@ -217,6 +283,7 @@ pub(crate) fn cmd_design(args: &[String]) {
         include_str!("../templates/designer/10-io.js"),
         include_str!("../templates/designer/11-boot.js"),
         include_str!("../templates/designer/12-run.js"),
+        include_str!("../templates/designer/13-teach.js"),
     ];
     let script = format!(
         "(async function () {{\n  \"use strict\";\n{}\n}})();",
@@ -238,6 +305,7 @@ pub(crate) fn cmd_design(args: &[String]) {
     let html = template
         .replace("__BUILD__", &build_id)
         .replace("//__EXAMPLES__\n[];", &format!("{examples_json};"))
+        .replace("//__LESSONS__\n[];", &format!("{lessons_json};"))
         .replace("//__PARTS__\n[];", &format!("{parts_json};"))
         .replace("//__NETLIST__\nnull;", &format!("{netlist_json};"))
         .replace("//__WASM__\n\"\";", &format!("\"{b64}\";"));

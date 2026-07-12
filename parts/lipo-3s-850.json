@@ -1,0 +1,26 @@
+{
+  "id": "lipo-3s-850",
+  "kind": "battery",
+  "mass_g": 58.0,
+  "provisional": true,
+  "notes": "3S 850mAh; the size step up from lipo-3s-450 for builds with a weapon motor's much higher stall draw",
+  "elec": {
+    "pins": {
+      "+": {
+        "role": "pos",
+        "required": true
+      },
+      "-": {
+        "role": "gnd",
+        "required": true
+      }
+    },
+    "source": {
+      "volts": 11.1,
+      "c_rating": 35.0,
+      "capacity_mah": 850.0,
+      "r_internal_ohm": 0.07
+    }
+  },
+  "description": "A higher-capacity three-cell pack for builds that need real headroom under a weapon motor's stall current, not just a drive motor's — more mass than lipo-3s-450, in exchange for a rail that doesn't trip E30 the moment a weapon is added."
+}

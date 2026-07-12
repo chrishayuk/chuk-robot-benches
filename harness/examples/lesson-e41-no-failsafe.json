@@ -1,0 +1,20 @@
+{
+  "name": "lesson-e41-no-failsafe",
+  "instances": {
+    "batt": "lipo-2s-260", "sw": "power-switch-slide", "esc": "bbb-dual-esc",
+    "mcu": "rp2350-zero", "rx": "elrs-rx", "m1": "n20-motor-6v"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
+    { "id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 7.4 },
+    { "id": "v5", "pins": ["esc.BEC5V", "mcu.5V", "rx.VIN"], "volts": 5.0 },
+    { "id": "gnd", "pins": ["batt.-", "esc.GND", "mcu.GND", "rx.GND"] },
+    { "id": "m1_a", "pins": ["esc.M1+", "m1.M+"] },
+    { "id": "m1_b", "pins": ["esc.M1-", "m1.M-"] },
+    { "id": "pwm_l", "pins": ["mcu.GP2", "esc.S1"], "signal": "pwm" },
+    { "id": "s2_unused", "pins": ["esc.S2"], "signal": "pwm" },
+    { "id": "crsf", "pins": ["rx.TX", "mcu.GP1"], "signal": "uart" }
+  ],
+  "buses": [],
+  "failsafe": null
+}

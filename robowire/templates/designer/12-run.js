@@ -75,17 +75,281 @@
     }
   }
 
+  function ledGlowColor(inst) {
+    const partId = nl.instances[inst] || "";
+    return partId.includes("green") ? "#57b48f" : partId.includes("red") ? "#e05c50" : "#e8a33d";
+  }
+
+  // An unprotected, powered LED isn't "extra bright" — E33's own words are
+  // "would burn out instantly" (checks.rs). Show the actual consequence of
+  // running this circuit: a scorched, cracked bulb with smoke, not a
+  // brighter version of "working". Instantaneous, not animated — this is a
+  // pure function of the current input like everything else here, not a
+  // timed sequence (no persistent damage tracking across edits either: fix
+  // the circuit and it's a normal LED again, matching the no-timestep
+  // model the rest of run mode already commits to).
+  function drawBurnedLed(x, y, r) {
+    cx.save();
+    cx.fillStyle = "#1a1512";
+    cx.beginPath(); cx.arc(x, y, r, 0, Math.PI * 2); cx.fill();
+    cx.strokeStyle = "#3a2f28"; cx.lineWidth = 1.5;
+    cx.beginPath(); cx.arc(x, y, r, 0, Math.PI * 2); cx.stroke();
+    cx.strokeStyle = "#0a0807"; cx.lineWidth = 1;
+    cx.beginPath();
+    cx.moveTo(x - r * 0.5, y - r * 0.4);
+    cx.lineTo(x - r * 0.1, y);
+    cx.lineTo(x + r * 0.3, y - r * 0.2);
+    cx.lineTo(x + r * 0.5, y + r * 0.5);
+    cx.stroke();
+    cx.strokeStyle = "#8b969b"; cx.lineWidth = 1.5; cx.globalAlpha = 0.5;
+    for (const dx of [-r * 0.4, r * 0.4]) {
+      cx.beginPath();
+      cx.moveTo(x + dx, y - r);
+      cx.quadraticCurveTo(x + dx - 4, y - r - 8, x + dx + 3, y - r - 16);
+      cx.stroke();
+    }
+    cx.restore();
+  }
+
+  function ledGlow(x, y, r, inst, s) {
+    const linear = Math.min(1, (s.current_a ?? 0) / 0.02);
+    const brightness = Math.pow(linear, 2.2);
+    cx.save();
+    cx.shadowColor = ledGlowColor(inst);
+    cx.shadowBlur = 2 + brightness * 26;
+    cx.fillStyle = ledGlowColor(inst);
+    cx.globalAlpha = 0.04 + brightness * 0.81;
+    cx.beginPath(); cx.arc(x, y, r, 0, Math.PI * 2); cx.fill();
+    cx.restore();
+  }
+
+  function ledOff(x, y, r, inst) {
+    // Clearly OFF, not just "no glow drawn" — a dim, outlined bulb in the
+    // LED's own color reads unambiguously as "off", where absence of any
+    // marking could just as easily read as "not rendered yet".
+    cx.save();
+    cx.fillStyle = ledGlowColor(inst);
+    cx.globalAlpha = 0.1;
+    cx.beginPath(); cx.arc(x, y, r, 0, Math.PI * 2); cx.fill();
+    cx.globalAlpha = 1;
+    cx.strokeStyle = "#565f66"; cx.lineWidth = 1.5;
+    cx.beginPath(); cx.arc(x, y, r, 0, Math.PI * 2); cx.stroke();
+    cx.restore();
+  }
+
+  function closedOutline2d(g, s) {
+    if (!s.closed) return;
+    cx.save();
+    cx.strokeStyle = "#57b48f"; cx.lineWidth = 3;
+    roundRect(g.x - g.w / 2, g.y - g.h / 2, g.w, g.h, 6);
+    cx.stroke();
+    cx.restore();
+  }
+
+  function closedDot3d(q, s) {
+    if (!s.closed) return;
+    cx.fillStyle = "#57b48f";
+    cx.beginPath(); cx.arc(q[0], q[1], 5, 0, Math.PI * 2); cx.fill();
+  }
+
+  // --- Per-kind run-mode component registry ------------------------------
+  // Each kind's complete run-mode behavior — default input, click handling,
+  // panel row markup + wiring, live readout text, and canvas overlay — in
+  // one place, dispatched generically by the call sites below rather than
+  // scattered across all of them (the gap that let the motor's own
+  // "powered" state go unrendered for a while: nothing here forced every
+  // kind's behavior to live somewhere findable). Kinds absent here
+  // (regulator/esc/radio/buzzer/servo) fall through to each call site's
+  // generic default (a plain readout span showing "powered/unpowered ·
+  // X.XXA"; no overlay) — genuinely identical behavior across those five,
+  // not worth a registry entry each. `mcu` gets its own entry below (its
+  // drivable pins are the run-mode signal source for a motor's throttle),
+  // but still falls through to that same generic readout for its own
+  // powered/current status, having no `updateReadout` of its own.
+  const RUN_COMPONENTS = {
+    switch: {
+      defaultInput: (inst, part, inputs) => { inputs.switches[inst] = false; },
+      handlePointerDown: (inst) => { toggleSwitch(inst); return true; },
+      panelControl: () => `<button class="mini runToggle" data-kind="switch"></button>`,
+      wireRow: (inst, refs) => {
+        if (refs.toggle) refs.toggle.addEventListener("click", () => toggleSwitch(inst));
+      },
+      drawOverlay2d: (inst, g, s) => closedOutline2d(g, s),
+      drawOverlay3d: (inst, q, s) => closedDot3d(q, s),
+    },
+    button: {
+      defaultInput: (inst, part, inputs) => { inputs.buttons[inst] = false; },
+      handlePointerDown: (inst) => { heldButtonInst = inst; setButtonHeld(inst, true); return true; },
+      panelControl: () => `<button class="mini runToggle" data-kind="button"></button>`,
+      wireRow: (inst, refs) => {
+        if (refs.toggle) refs.toggle.addEventListener("pointerdown", () => { heldButtonInst = inst; setButtonHeld(inst, true); });
+      },
+      drawOverlay2d: (inst, g, s) => closedOutline2d(g, s),
+      drawOverlay3d: (inst, q, s) => closedDot3d(q, s),
+    },
+    motor: {
+      // No slider of its own: a motor's throttle is commanded by whichever
+      // MCU pin its driver channel actually resolves to (see the `mcu`
+      // entry below and `robowire::signal`) — pinning a control directly to
+      // the motor instance would let it spin with no signal wiring at all,
+      // exactly the shortcut that made run mode unable to catch a real
+      // brain-to-ESC wiring mistake.
+      updateReadout: (inst, part, s, refs) => {
+        refs.readout.textContent =
+          `spin ${(s.spin ?? 0).toFixed(2)}` + (s.current_a != null ? ` · ${s.current_a.toFixed(2)}A` : "");
+      },
+      drawOverlay2d: (inst, g, s) => {
+        // The driver channel being powered is a distinct, always-visible
+        // state from actually spinning — a motor idling at zero throttle on
+        // a live rail otherwise looks identical to one with no power
+        // reaching it at all (the spin tick only appears once throttle !=
+        // 0), the same gap switch/LED already close with a visible
+        // closed/lit state independent of anything else moving.
+        if (s.powered) {
+          cx.save();
+          cx.strokeStyle = "#57b48f"; cx.lineWidth = 2;
+          roundRect(g.x - g.w / 2, g.y - g.h / 2, g.w, g.h, 6);
+          cx.stroke();
+          cx.restore();
+        }
+        if (Math.abs(s.spin || 0) > 0.001) {
+          cx.save();
+          cx.translate(g.x, g.y);
+          cx.rotate(spinPhase * Math.sign(s.spin));
+          cx.strokeStyle = "#e8a33d"; cx.lineWidth = 2;
+          cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, -Math.min(g.w, g.h) / 2 - 2); cx.stroke();
+          cx.restore();
+        }
+        if (s.current_a != null) {
+          cx.fillStyle = "#c7ced2";
+          cx.font = "9px ui-monospace, Menlo, monospace";
+          cx.fillText(`${s.current_a.toFixed(2)}A`, g.x - g.w / 2 + 8, g.y + g.h / 2 - 6);
+        }
+      },
+      drawOverlay3d: (inst, q, s) => {
+        // Same "powered, independent of spin" distinction as the 2D overlay.
+        if (s.powered) {
+          cx.fillStyle = "#57b48f";
+          cx.beginPath(); cx.arc(q[0] - 10, q[1] - 10, 3, 0, Math.PI * 2); cx.fill();
+        }
+        if (Math.abs(s.spin || 0) > 0.001) {
+          cx.save();
+          cx.translate(q[0], q[1]);
+          cx.rotate(spinPhase * Math.sign(s.spin));
+          cx.strokeStyle = "#e8a33d"; cx.lineWidth = 2;
+          cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, -10); cx.stroke();
+          cx.restore();
+        }
+      },
+    },
+    potentiometer: {
+      defaultInput: (inst, part, inputs) => { inputs.dial_positions[inst] = 0.5; },
+      panelControl: (inst) =>
+        `<input type="range" class="runDial" min="0" max="1" step="0.01" value="${runInputs.dial_positions[inst] ?? 0.5}"> <span class="runReadout"></span>`,
+      wireRow: (inst, refs) => {
+        const dial = refs.row.querySelector(".runDial");
+        if (dial) dial.addEventListener("input", () => setDialPosition(inst, parseFloat(dial.value)));
+      },
+      updateReadout: (inst, part, s, refs) => {
+        refs.readout.textContent = `${Math.round((runInputs.dial_positions[inst] ?? 0.5) * 100)}%`;
+      },
+    },
+    tof: {
+      defaultInput: (inst, part, inputs) => { inputs.sensor_values[inst] = part.range_mm ?? 0; },
+      panelControl: (inst) =>
+        `<input type="number" class="runSensor" value="${runInputs.sensor_values[inst] ?? 0}"> <span class="runReadout"></span>`,
+      wireRow: (inst, refs) => {
+        const sensor = refs.row.querySelector(".runSensor");
+        if (sensor) sensor.addEventListener("change", () => setSensorValue(inst, parseFloat(sensor.value) || 0));
+      },
+      updateReadout: (inst, part, s, refs) => {
+        refs.readout.innerHTML =
+          `${s.powered ? "live" : "unpowered"}` +
+          (s.bus_conflict ? ` <span style="color:var(--bad);font-weight:700">ADDRESS CONFLICT</span>` : "");
+      },
+      drawOverlay2d: (inst, g, s) => {
+        cx.save();
+        cx.fillStyle = s.powered ? "#57b48f" : "#4a575f";
+        cx.beginPath(); cx.arc(g.x + g.w / 2 - 8, g.y + g.h / 2 - 8, 3, 0, Math.PI * 2); cx.fill();
+        if (s.value !== undefined) {
+          cx.fillStyle = "#c7ced2";
+          cx.font = "9px ui-monospace, Menlo, monospace";
+          cx.fillText(Number(s.value).toFixed(0), g.x - g.w / 2 + 8, g.y + g.h / 2 - 6);
+        }
+        if (s.bus_conflict) {
+          cx.fillStyle = "#e05c50";
+          cx.font = "bold 9px ui-monospace, Menlo, monospace";
+          cx.fillText("CONFLICT", g.x - g.w / 2 + 8, g.y + g.h / 2 + 8);
+        }
+        cx.restore();
+      },
+      drawOverlay3d: (inst, q, s) => {
+        cx.fillStyle = s.bus_conflict ? "#e05c50" : s.powered ? "#57b48f" : "#4a575f";
+        cx.beginPath(); cx.arc(q[0] + 10, q[1] - 10, 3, 0, Math.PI * 2); cx.fill();
+      },
+    },
+    mcu: {
+      // One slider per pin the sim itself reports as actually driving
+      // something (`s.pwm_channels`, from `robowire::signal::mcu_drivable_pins`)
+      // — this UI never guesses which pins are "drivable" on its own; it
+      // only ever renders what robosim already resolved from the real
+      // wiring. Standing in for a signal generator/RC receiver you'd hook
+      // up on a bench, one pin at a time, before any firmware exists.
+      panelControl: (inst) => {
+        const channels = (runState.instances[inst] || {}).pwm_channels || [];
+        if (!channels.length) return `<span class="runReadout"></span>`;
+        const caption = `<div class="d" style="color:var(--dim);font-size:10px">` +
+          `standing in for a signal generator / RC receiver — no firmware runs here</div>`;
+        const rows = channels.map(c => {
+          const pin = `${inst}.${c.pin}`;
+          const label = c.drives ? `${c.pin} → ${c.drives}` : `${c.pin} (unconnected downstream)`;
+          const v = runInputs.pwm_signals[pin] ?? 0;
+          return `<div class="d" style="margin-top:4px">${label}` +
+            `<input type="range" class="runPwm" data-pin="${pin}" min="-1" max="1" step="0.05" value="${v}">` +
+            `</div>`;
+        });
+        return caption + rows.join("") + `<span class="runReadout"></span>`;
+      },
+      wireRow: (inst, refs) => {
+        for (const el of refs.row.querySelectorAll(".runPwm")) {
+          const pin = el.dataset.pin;
+          el.addEventListener("input", () => setPwmSignal(pin, parseFloat(el.value)));
+        }
+      },
+    },
+    led: {
+      // Brightness tracks live current (20mA ~ a typical indicator LED's
+      // rated forward current, used only as a "what counts as fully
+      // bright" reference for this glow — not a declared/authoritative
+      // figure). Gamma-corrected (^2.2, the standard display gamma): human
+      // brightness perception is far more sensitive at low light levels
+      // than current itself is linear, so a LINEAR current->alpha mapping
+      // still looks "clearly on" well below rated current. No alpha/blur
+      // floor either, so it can fade all the way toward the off-state
+      // look. `burned` (no series resistor) takes priority over both.
+      drawOverlay2d: (inst, g, s) => {
+        const r = Math.min(g.w, g.h) / 2 + 4;
+        if (s.burned) drawBurnedLed(g.x, g.y, r);
+        else if (s.lit) ledGlow(g.x, g.y, r, inst, s);
+        else ledOff(g.x, g.y, r, inst);
+      },
+      drawOverlay3d: (inst, q, s) => {
+        if (s.burned) drawBurnedLed(q[0], q[1], 8);
+        else if (s.lit) ledGlow(q[0], q[1], 8, inst, s);
+        else ledOff(q[0], q[1], 8, inst);
+      },
+    },
+  };
+  // imu shares every tof behavior except its default fake reading (0, not
+  // range_mm — imu has no "range").
+  RUN_COMPONENTS.imu = { ...RUN_COMPONENTS.tof, defaultInput: (inst, part, inputs) => { inputs.sensor_values[inst] = 0; } };
+
   function defaultRunInputs() {
-    const inputs = { switches: {}, buttons: {}, throttles: {}, dial_positions: {}, sensor_values: {} };
+    const inputs = { switches: {}, buttons: {}, pwm_signals: {}, dial_positions: {}, sensor_values: {} };
     for (const [inst, partId] of Object.entries(nl.instances)) {
       const part = partById[partId];
       if (!part) continue;
-      if (part.kind === "switch") inputs.switches[inst] = false;
-      if (part.kind === "button") inputs.buttons[inst] = false;
-      if (part.kind === "motor") inputs.throttles[inst] = 0;
-      if (part.kind === "potentiometer") inputs.dial_positions[inst] = 0.5;
-      if (part.kind === "tof") inputs.sensor_values[inst] = part.range_mm ?? 0;
-      if (part.kind === "imu") inputs.sensor_values[inst] = 0;
+      RUN_COMPONENTS[part.kind]?.defaultInput?.(inst, part, inputs);
     }
     return inputs;
   }
@@ -102,7 +366,7 @@
   function toggleSwitch(inst) { runInputs.switches[inst] = !runInputs.switches[inst]; updateRunState(); }
   function setDialPosition(inst, v) { runInputs.dial_positions[inst] = v; updateRunState(); }
   function setButtonHeld(inst, held) { runInputs.buttons[inst] = held; updateRunState(); }
-  function setThrottle(inst, v) { runInputs.throttles[inst] = v; updateRunState(); }
+  function setPwmSignal(pin, v) { runInputs.pwm_signals[pin] = v; updateRunState(); }
   function setSensorValue(inst, v) { runInputs.sensor_values[inst] = v; updateRunState(); }
 
   // Global release, not just cv's pointerup: a hold started from the side
@@ -116,9 +380,7 @@
     const inst = instAt(mx, my);
     if (!inst) return false;
     const kind = kindOf(inst);
-    if (kind === "switch") { toggleSwitch(inst); return true; }
-    if (kind === "button") { heldButtonInst = inst; setButtonHeld(inst, true); return true; }
-    return false;
+    return RUN_COMPONENTS[kind]?.handlePointerDown?.(inst) ?? false;
   }
 
   function ensureSpinLoop() {
@@ -136,6 +398,7 @@
   }
 
   function enterRunMode() {
+    if (teachMode) exitTeachMode();
     runMode = true;
     runInputs = defaultRunInputs();
     const left = document.getElementById("left");
@@ -167,7 +430,14 @@
     const btn = document.getElementById("runBtn");
     btn.textContent = "run mode";
     btn.classList.remove("primary");
-    document.getElementById("runPanel").style.display = "none";
+    const panel = document.getElementById("runPanel");
+    panel.style.display = "none";
+    panel.innerHTML = "";
+    runRowRefs = {}; // rows are keyed by instance name and built once per
+    // entry (see buildRunPanelRow) — without this, re-entering run mode
+    // after loading a different netlist would keep showing stale rows for
+    // instances that no longer exist (or, worse, reuse a row built for a
+    // different kind under the same instance name).
     draw();
   }
 
@@ -180,34 +450,16 @@
   function buildRunPanelRow(inst, part) {
     const row = document.createElement("div");
     row.className = "row runrow";
+    const comp = RUN_COMPONENTS[part.kind];
     let body = `<div class="hd"><b>${inst}</b> <span class="k">${part.kind}</span></div>`;
-    if (part.kind === "switch" || part.kind === "button") {
-      body += `<button class="mini runToggle" data-kind="${part.kind}"></button>`;
-    } else if (part.kind === "motor") {
-      body += `<input type="range" class="runThrottle" min="-1" max="1" step="0.05" value="${runInputs.throttles[inst] ?? 0}"> <span class="runReadout"></span>`;
-    } else if (part.kind === "potentiometer") {
-      body += `<input type="range" class="runDial" min="0" max="1" step="0.01" value="${runInputs.dial_positions[inst] ?? 0.5}"> <span class="runReadout"></span>`;
-    } else if (part.kind === "tof" || part.kind === "imu") {
-      body += `<input type="number" class="runSensor" value="${runInputs.sensor_values[inst] ?? 0}"> <span class="runReadout"></span>`;
-    } else {
-      body += `<span class="runReadout"></span>`;
-    }
+    body += comp?.panelControl ? comp.panelControl(inst, part) : `<span class="runReadout"></span>`;
     body += `<div class="d runReason" style="margin-top:3px;color:var(--dim)"></div>`;
     row.innerHTML = body;
 
     const refs = { row, readout: row.querySelector(".runReadout"), reason: row.querySelector(".runReason") };
     const toggle = row.querySelector(".runToggle");
-    if (toggle) {
-      refs.toggle = toggle;
-      if (part.kind === "switch") toggle.addEventListener("click", () => toggleSwitch(inst));
-      else toggle.addEventListener("pointerdown", () => { heldButtonInst = inst; setButtonHeld(inst, true); });
-    }
-    const throttle = row.querySelector(".runThrottle");
-    if (throttle) throttle.addEventListener("input", () => setThrottle(inst, parseFloat(throttle.value)));
-    const dial = row.querySelector(".runDial");
-    if (dial) dial.addEventListener("input", () => setDialPosition(inst, parseFloat(dial.value)));
-    const sensor = row.querySelector(".runSensor");
-    if (sensor) sensor.addEventListener("change", () => setSensorValue(inst, parseFloat(sensor.value) || 0));
+    if (toggle) refs.toggle = toggle;
+    comp?.wireRow?.(inst, refs);
     return refs;
   }
 
@@ -230,13 +482,9 @@
       const s = (runState.instances || {})[inst] || {};
       if (refs.toggle) refs.toggle.textContent = s.closed ? "ON" : "off";
       if (refs.readout) {
-        if (part.kind === "motor") {
-          refs.readout.textContent = `spin ${(s.spin ?? 0).toFixed(2)}` + (s.current_a != null ? ` · ${s.current_a.toFixed(2)}A` : "");
-        } else if (part.kind === "potentiometer") {
-          refs.readout.textContent = `${Math.round((runInputs.dial_positions[inst] ?? 0.5) * 100)}%`;
-        } else if (part.kind === "tof" || part.kind === "imu") {
-          refs.readout.innerHTML = `${s.powered ? "live" : "unpowered"}` +
-            (s.bus_conflict ? ` <span style="color:var(--bad);font-weight:700">ADDRESS CONFLICT</span>` : "");
+        const comp = RUN_COMPONENTS[part.kind];
+        if (comp?.updateReadout) {
+          comp.updateReadout(inst, part, s, refs);
         } else if (s.powered !== undefined) {
           refs.readout.textContent = `${s.powered ? "powered" : "unpowered"}` + (s.current_a != null ? ` · ${s.current_a.toFixed(2)}A` : "");
         }
@@ -256,142 +504,16 @@
     return [x, y];
   }
 
-  function ledGlowColor(inst) {
-    const partId = nl.instances[inst] || "";
-    return partId.includes("green") ? "#57b48f" : partId.includes("red") ? "#e05c50" : "#e8a33d";
-  }
-
   function drawRunOverlay2d(inst, g) {
     const s = (runState.instances || {})[inst];
     if (!s) return;
-    const kind = kindOf(inst);
-    if (kind === "led") {
-      const r = Math.min(g.w, g.h) / 2 + 4;
-      if (s.lit) {
-        // Brightness tracks live current (20mA ~ a typical indicator LED's
-        // rated forward current, used only as a "what counts as fully
-        // bright" reference for this glow — not a declared/authoritative
-        // figure). Gamma-corrected (^2.2, the standard display gamma): human
-        // brightness perception is far more sensitive at low light levels
-        // than current itself is linear, so a LINEAR current->alpha mapping
-        // still looks "clearly on" well below rated current — a dimmer
-        // pushed most of the way down needs to look convincingly dim, not
-        // just "a bit less bright". No alpha/blur floor either, so it can
-        // fade all the way toward the off-state look.
-        const linear = s.current_limited ? Math.min(1, (s.current_a ?? 0) / 0.02) : 1;
-        const brightness = s.current_limited ? Math.pow(linear, 2.2) : 1;
-        cx.save();
-        cx.shadowColor = ledGlowColor(inst);
-        cx.shadowBlur = s.current_limited ? 2 + brightness * 26 : 28;
-        cx.fillStyle = ledGlowColor(inst);
-        cx.globalAlpha = s.current_limited ? 0.04 + brightness * 0.81 : 0.85;
-        cx.beginPath(); cx.arc(g.x, g.y, r, 0, Math.PI * 2); cx.fill();
-        cx.restore();
-      } else {
-        // Clearly OFF, not just "no glow drawn" — a dim, outlined bulb in
-        // the LED's own color reads unambiguously as "off", where absence
-        // of any marking could just as easily read as "not rendered yet".
-        cx.save();
-        cx.fillStyle = ledGlowColor(inst);
-        cx.globalAlpha = 0.1;
-        cx.beginPath(); cx.arc(g.x, g.y, r, 0, Math.PI * 2); cx.fill();
-        cx.globalAlpha = 1;
-        cx.strokeStyle = "#565f66"; cx.lineWidth = 1.5;
-        cx.beginPath(); cx.arc(g.x, g.y, r, 0, Math.PI * 2); cx.stroke();
-        cx.restore();
-      }
-    }
-    if ((kind === "switch" || kind === "button") && s.closed) {
-      cx.save();
-      cx.strokeStyle = "#57b48f"; cx.lineWidth = 3;
-      roundRect(g.x - g.w / 2, g.y - g.h / 2, g.w, g.h, 6);
-      cx.stroke();
-      cx.restore();
-    }
-    if (kind === "motor" && Math.abs(s.spin || 0) > 0.001) {
-      cx.save();
-      cx.translate(g.x, g.y);
-      cx.rotate(spinPhase * Math.sign(s.spin));
-      cx.strokeStyle = "#e8a33d"; cx.lineWidth = 2;
-      cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, -Math.min(g.w, g.h) / 2 - 2); cx.stroke();
-      cx.restore();
-    }
-    if (kind === "motor" && s.current_a != null) {
-      cx.fillStyle = "#c7ced2";
-      cx.font = "9px ui-monospace, Menlo, monospace";
-      cx.fillText(`${s.current_a.toFixed(2)}A`, g.x - g.w / 2 + 8, g.y + g.h / 2 - 6);
-    }
-    if (kind === "tof" || kind === "imu") {
-      cx.save();
-      cx.fillStyle = s.powered ? "#57b48f" : "#4a575f";
-      cx.beginPath(); cx.arc(g.x + g.w / 2 - 8, g.y + g.h / 2 - 8, 3, 0, Math.PI * 2); cx.fill();
-      if (s.value !== undefined) {
-        cx.fillStyle = "#c7ced2";
-        cx.font = "9px ui-monospace, Menlo, monospace";
-        cx.fillText(Number(s.value).toFixed(0), g.x - g.w / 2 + 8, g.y + g.h / 2 - 6);
-      }
-      if (s.bus_conflict) {
-        cx.fillStyle = "#e05c50";
-        cx.font = "bold 9px ui-monospace, Menlo, monospace";
-        cx.fillText("CONFLICT", g.x - g.w / 2 + 8, g.y + g.h / 2 + 8);
-      }
-      cx.restore();
-    }
+    RUN_COMPONENTS[kindOf(inst)]?.drawOverlay2d?.(inst, g, s);
   }
 
   function drawRunOverlay3d(inst, q) {
     const s = (runState.instances || {})[inst];
     if (!s) return;
-    const kind = kindOf(inst);
-    if (kind === "led") {
-      if (s.lit) {
-        // Brightness tracks live current (20mA ~ a typical indicator LED's
-        // rated forward current, used only as a "what counts as fully
-        // bright" reference for this glow — not a declared/authoritative
-        // figure). Gamma-corrected (^2.2, the standard display gamma): human
-        // brightness perception is far more sensitive at low light levels
-        // than current itself is linear, so a LINEAR current->alpha mapping
-        // still looks "clearly on" well below rated current — a dimmer
-        // pushed most of the way down needs to look convincingly dim, not
-        // just "a bit less bright". No alpha/blur floor either, so it can
-        // fade all the way toward the off-state look.
-        const linear = s.current_limited ? Math.min(1, (s.current_a ?? 0) / 0.02) : 1;
-        const brightness = s.current_limited ? Math.pow(linear, 2.2) : 1;
-        cx.save();
-        cx.shadowColor = ledGlowColor(inst);
-        cx.shadowBlur = s.current_limited ? 2 + brightness * 26 : 28;
-        cx.fillStyle = ledGlowColor(inst);
-        cx.globalAlpha = s.current_limited ? 0.04 + brightness * 0.81 : 0.85;
-        cx.beginPath(); cx.arc(q[0], q[1], 8, 0, Math.PI * 2); cx.fill();
-        cx.restore();
-      } else {
-        // Clearly OFF, not just "no glow drawn" — see the 2D overlay for why.
-        cx.save();
-        cx.fillStyle = ledGlowColor(inst);
-        cx.globalAlpha = 0.1;
-        cx.beginPath(); cx.arc(q[0], q[1], 8, 0, Math.PI * 2); cx.fill();
-        cx.globalAlpha = 1;
-        cx.strokeStyle = "#565f66"; cx.lineWidth = 1.5;
-        cx.beginPath(); cx.arc(q[0], q[1], 8, 0, Math.PI * 2); cx.stroke();
-        cx.restore();
-      }
-    }
-    if ((kind === "switch" || kind === "button") && s.closed) {
-      cx.fillStyle = "#57b48f";
-      cx.beginPath(); cx.arc(q[0], q[1], 5, 0, Math.PI * 2); cx.fill();
-    }
-    if (kind === "motor" && Math.abs(s.spin || 0) > 0.001) {
-      cx.save();
-      cx.translate(q[0], q[1]);
-      cx.rotate(spinPhase * Math.sign(s.spin));
-      cx.strokeStyle = "#e8a33d"; cx.lineWidth = 2;
-      cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, -10); cx.stroke();
-      cx.restore();
-    }
-    if (kind === "tof" || kind === "imu") {
-      cx.fillStyle = s.bus_conflict ? "#e05c50" : s.powered ? "#57b48f" : "#4a575f";
-      cx.beginPath(); cx.arc(q[0] + 10, q[1] - 10, 3, 0, Math.PI * 2); cx.fill();
-    }
+    RUN_COMPONENTS[kindOf(inst)]?.drawOverlay3d?.(inst, q, s);
   }
 
   document.getElementById("runBtn").addEventListener("click", () => { runMode ? exitRunMode() : enterRunMode(); });

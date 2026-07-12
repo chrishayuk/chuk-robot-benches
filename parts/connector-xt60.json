@@ -1,0 +1,15 @@
+{
+  "id": "connector-xt60",
+  "kind": "connector",
+  "mass_g": 2.5,
+  "provisional": true,
+  "rated_a": 60.0,
+  "notes": "XT60-style bullet connector pair, 60A rated — a size up from XT30, for builds whose worst-case current is getting close to XT30's headroom.",
+  "description": "A bigger battery connector than XT30, rated for a worst-case current like any other part in the chain — an undersized connector is exactly as dangerous as an undersized wire.",
+  "elec": {
+    "pins": {
+      "P1": { "role": "passive", "required": true },
+      "P2": { "role": "passive", "required": true }
+    }
+  }
+}

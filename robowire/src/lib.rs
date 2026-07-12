@@ -18,6 +18,8 @@ pub mod power_graph;
 pub mod prose;
 pub mod render;
 pub mod schema;
+pub mod signal;
+pub mod teach;
 pub mod view;
 pub mod wire;
 

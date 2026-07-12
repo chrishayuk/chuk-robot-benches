@@ -11,9 +11,14 @@ pub struct RunInputs {
     /// button instance -> held?
     #[serde(default)]
     pub buttons: BTreeMap<String, bool>,
-    /// motor instance -> throttle in [-1.0, 1.0]
+    /// MCU pin endpoint (e.g. "mcu.GP2") -> commanded signal in [-1.0, 1.0].
+    /// Keyed by the pin that would really be carrying this PWM signal, not
+    /// by whatever motor it happens to end up driving — a stand-in for the
+    /// signal generator/RC receiver you'd hook up on a real bench before any
+    /// firmware exists, not for the firmware itself (see `robowire::signal`
+    /// for how this reaches a motor's own throttle).
     #[serde(default)]
-    pub throttles: BTreeMap<String, f64>,
+    pub pwm_signals: BTreeMap<String, f64>,
     /// potentiometer instance -> dial position in [0.0, 1.0], scaling its
     /// live resistance between the part's declared ohms_min and ohms_max.
     #[serde(default)]
@@ -62,6 +67,14 @@ pub struct InstanceRunState {
     pub lit: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_limited: Option<bool>,
+    /// LED-kind only: `lit && !current_limited` — a real consequence of
+    /// this circuit's wiring (E33: no series resistor means it burns out
+    /// instantly under power), not a rendering-layer inference. Computed
+    /// here rather than left for the designer to reconstruct from `lit`/
+    /// `current_limited` itself, so there's exactly one place that decides
+    /// what "burned" means.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub burned: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spin: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -85,6 +98,20 @@ pub struct InstanceRunState {
     pub sag_v: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// MCU-kind only: every `mcu_io` pin actually wired to drive something
+    /// (a `signal_in`-role pin), with the motor instance it resolves to when
+    /// determinable (`robowire::signal::mcu_drivable_pins`) — the run panel
+    /// renders one slider per entry here, on the MCU's own row, rather than
+    /// the UI independently guessing which pins are "drivable".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pwm_channels: Option<Vec<PwmChannel>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct PwmChannel {
+    pub pin: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drives: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

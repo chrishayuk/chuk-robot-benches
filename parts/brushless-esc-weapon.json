@@ -1,0 +1,19 @@
+{
+  "id": "brushless-esc-weapon",
+  "kind": "esc",
+  "mass_g": 6.0,
+  "provisional": true,
+  "current_ma": 20.0,
+  "nominal_v": 11.1,
+  "notes": "single-channel brushless ESC for a weapon motor; no BEC of its own — the brain's 5V typically comes from the drive ESC instead. 3-phase commutation happens inside the ESC and isn't modelled here (not SPICE) — from the battery's perspective this is checked the same way as any other motor driver: polarity, channel resolution, worst-case current budget, wire gauge.",
+  "description": "The weapon's motor controller. Unlike the drive ESC, it only drives one motor (the spinner/hammer/lifter's weapon) and usually has no onboard 5V regulator of its own.",
+  "elec": {
+    "pins": {
+      "VIN": { "role": "power_in", "v_range": [6.0, 16.8], "required": true },
+      "GND": { "role": "gnd", "required": true },
+      "S1": { "role": "signal_in", "signal": "pwm", "required": true, "channel": "M1" },
+      "M1+": { "role": "motor_out", "channel": "M1" },
+      "M1-": { "role": "motor_out", "channel": "M1" }
+    }
+  }
+}

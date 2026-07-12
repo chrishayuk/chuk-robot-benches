@@ -125,6 +125,34 @@ v0.1 set, drawn from how ant-class bots actually die:
 Check set is extensible; every new physical failure in the lab that was statically
 detectable becomes a new E-code (the compose-linker discipline: bugs become rules).
 
+**Teaching layer.** The checker doubles as a tutor: `robowire explain <netlist.json>`
+prints the same plain-English per-net prose the designer shows (`robowire::prose`,
+single-sourced — no separate CLI-only copy), and `robowire explain-error <CODE>` prints a
+what/why/fix explanation for a check code (`robowire::teach`), independent of any one
+netlist. `harness/examples/lesson-*.json` pairs a legal harness with a deliberately-broken
+variant per code (`lesson-<code>-<name>.json`), auto-verified by
+`examples_are_legal_and_lessons_fail_their_named_code` — predict whether it should pass,
+run the checker, then read `explain-error` for the code it names.
+
+`harness/lessons/NN-slug[.json]/NN-slug-broken.json` is a separate, ordered curriculum —
+"start from the real basics and work up," each stage a strict superset of the last
+(`each_stage_strictly_adds_to_the_last`, `robowire/tests/lessons.rs`): `01-basics`
+(battery/switch/resistor/LED) → `02-motor-driver` (+ESC+motor) → `03-brain-and-radio`
+(+MCU+receiver, BEC/PWM/UART/failsafe) → `04-shared-5v-rail` (+servo — its broken variant
+deliberately fails two codes, E02 overvoltage and E32 brownout, from one mistake: wiring
+the brain straight to the battery instead of through the BEC) → `05-sensor-bus` (+2×ToF,
+the dual-0x29 classic, E20). Only one motor channel is used throughout — `rp2350-zero`
+has just two PWM-capable pins, and the servo needs one, so there's no channel left for a
+second drive motor without widening the catalogue.
+
+The designer has a **teaching mode** (mirrors run mode's toggle) that puts this loop
+directly in the UI: the sidebar renders the numbered curriculum in order (not the flat
+`lesson-*.json` drills, which stay in the normal sidebar), editing stays live (unlike run
+mode — a repair exercise means fixing the broken netlist, not just watching it), and a
+teach panel shows the what/why/fix for whichever check is currently failing (computed
+live, not parsed from a filename) or any check row clicked — fed by a new wasm export
+(`explain_error_json`) over the same `robowire::teach` content the CLI uses.
+
 ## 3a. Interactive run mode (designer)
 
 The netlist plus catalogue support one more read: not just "is this legal" (§3) but

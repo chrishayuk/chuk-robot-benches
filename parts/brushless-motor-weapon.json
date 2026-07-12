@@ -1,0 +1,20 @@
+{
+  "id": "brushless-motor-weapon",
+  "kind": "motor",
+  "mass_g": 22.0,
+  "provisional": true,
+  "notes": "small outrunner brushless weapon motor; 3-phase winding modelled as an equivalent 2-wire interface (same simplification as brushless-esc-weapon) — real per-phase commutation current isn't simulated, just the worst-case stall draw a power budget needs to catch.",
+  "elec": {
+    "pins": {
+      "M+": { "role": "motor_in", "required": true },
+      "M-": { "role": "motor_in", "required": true }
+    }
+  },
+  "description": "The weapon motor: spins a disc, bar, or drum at high RPM. Draws far more current under a stall (a jam, a hit) than a drive motor ever does — exactly the worst case E30/E31 exist to catch.",
+  "motor": {
+    "stall_torque_mnm": 60.0,
+    "no_load_rpm": 32000.0,
+    "stall_current_a": 18.0,
+    "nominal_v": 11.1
+  }
+}

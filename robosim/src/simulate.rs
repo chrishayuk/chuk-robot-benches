@@ -10,9 +10,9 @@
 //! unchanged.)
 //!
 //! Reuses the same rule logic the E-checks already encode
-//! (`led_current_limited`, `bus_final_addresses`, `motor_output_pin` in
-//! `robowire::checks`) rather than re-deriving it, so a check and a run-mode
-//! projection can never disagree.
+//! (`led_current_limited`/`motor_output_pin`/`bus_final_addresses` via the
+//! `led`/`motor`/`sensor` component modules) rather than re-deriving it, so
+//! a check and a run-mode projection can never disagree.
 //!
 //! Edge cases (documented, not hidden): no battery instance -> everything
 //! reads dark/dead, no crash. Multiple batteries -> seeds are unioned; v1
@@ -22,15 +22,11 @@
 //! a hard error. Any instance with no `elec` block (e.g. `wheel`) is omitted
 //! from `RunState.instances` entirely.
 
-use crate::electrical::{
-    equiv_load_current, instance_powered, led_series_supply, motor_winding_ohms, net_volts_live,
-    pin_net_by_role, resolve_voltages,
-};
+use crate::electrical::{instance_powered, pin_net_by_role, resolve_voltages};
 use crate::graph::{bfs, endpoint_net_index, link, link_forward, reach_from};
-use crate::types::{InstanceRunState, NetRunState, RunInputs, RunState};
+use crate::types::{InstanceRunState, NetRunState, PwmChannel, RunInputs, RunState};
 use robowire::catalogue::ElecCatalogue;
-use robowire::checks::{bus_final_addresses, led_current_limited, motor_output_pin};
-use robowire::schema::{split_pin, Netlist};
+use robowire::schema::Netlist;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Result<RunState, String> {
@@ -165,156 +161,58 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
         ) {
             st.powered = Some(instance_powered(nl, cat, &net_of, &hot, &grounded, inst)?);
         }
+        let powered = st.powered.unwrap_or(false);
 
         match part.kind.as_str() {
             "switch" => st.closed = Some(inputs.switches.get(inst).copied().unwrap_or(false)),
             "button" => st.closed = Some(inputs.buttons.get(inst).copied().unwrap_or(false)),
             "regulator" | "esc" | "mcu" | "radio" | "buzzer" | "servo" => {
-                let mut amps = 0.0;
-                if st.powered == Some(true) {
-                    if let Some(supply_net) = pin_net_by_role(elec, inst, &net_of, "power_in") {
-                        let v_actual = net_volts_live(&resolved_volts, &hot, &supply_net);
-                        amps = equiv_load_current(part, v_actual);
-                        if amps > 0.0 {
-                            sinks.push((supply_net, amps));
-                        }
-                    }
+                let (fp_state, sink) =
+                    crate::fixed_power::compute(&net_of, &hot, &resolved_volts, elec, part, inst, powered);
+                st = fp_state;
+                if let Some(s) = sink {
+                    sinks.push(s);
                 }
-                st.current_a = Some(amps);
             }
             "tof" | "imu" => {
-                let default_val = part.range_mm.unwrap_or(0.0);
-                st.value = Some(inputs.sensor_values.get(inst).copied().unwrap_or(default_val));
-                for bus in &nl.buses {
-                    if !bus.devices.iter().any(|d| &d.inst == inst) {
-                        continue;
-                    }
-                    let finals = bus_final_addresses(bus);
-                    if let Some(my_addr) = finals.get(inst) {
-                        let conflict = finals.values().filter(|a| *a == my_addr).count() > 1;
-                        st.bus_conflict = Some(conflict);
-                    }
+                let (sensor_state, sink) =
+                    crate::sensor::compute(nl, &net_of, &hot, &resolved_volts, inputs, inst, part, elec, powered);
+                st = sensor_state;
+                if let Some(s) = sink {
+                    sinks.push(s);
                 }
-                let mut amps = 0.0;
-                if st.powered == Some(true) {
-                    if let Some(supply_net) = pin_net_by_role(elec, inst, &net_of, "power_in") {
-                        let v_actual = net_volts_live(&resolved_volts, &hot, &supply_net);
-                        amps = equiv_load_current(part, v_actual);
-                        if amps > 0.0 {
-                            sinks.push((supply_net, amps));
-                        }
-                    }
-                }
-                st.current_a = Some(amps);
             }
             "led" => {
-                let anode = pin_net_by_role(elec, inst, &net_of, "diode_a");
-                let cathode = pin_net_by_role(elec, inst, &net_of, "diode_k");
-                let anode_hot = anode.as_ref().is_some_and(|n| hot.contains(n));
-                let cathode_grounded = cathode.as_ref().is_some_and(|n| grounded.contains(n));
-                let lit = anode_hot && cathode_grounded;
-                let limited = led_current_limited(nl, cat, inst)?;
-                st.lit = Some(lit);
-                st.current_limited = Some(limited);
-
-                // A lit LED sustains its forward-voltage drop across itself —
-                // resolve that onto its own anode net for display, since a
-                // resistor bridge (unlike a switch/wire) never propagates
-                // voltage. Without this, a lit, current-carrying LED would
-                // show 0V on its own feed net (a resistor is a real boundary,
-                // §3a), the same "current flowing, 0V shown" inconsistency
-                // already fixed once for undeclared switch/button nets.
-                if lit {
-                    if let Some(anode_net) = &anode {
-                        resolved_volts.entry(anode_net.clone()).or_insert(part.forward_v.unwrap_or(0.0));
-                    }
+                let (led_state, sink) =
+                    crate::led::compute(nl, cat, &net_of, &hot, &grounded, &mut resolved_volts, inputs, inst, part, elec)?;
+                st = led_state;
+                if let Some(s) = sink {
+                    sinks.push(s);
                 }
-
-                let mut amps = 0.0;
-                if lit && limited {
-                    if let Some((supply_net, ohms)) = led_series_supply(nl, cat, &net_of, inputs, inst)? {
-                        if ohms > 0.0 {
-                            let v_supply = net_volts_live(&resolved_volts, &hot, &supply_net);
-                            let vf = part.forward_v.unwrap_or(0.0);
-                            amps = ((v_supply - vf) / ohms).max(0.0);
-                        }
-                    }
-                    if amps > 0.0 {
-                        if let Some(anode_net) = &anode {
-                            sinks.push((anode_net.clone(), amps));
-                        }
-                    }
-                }
-                st.current_a = Some(amps);
-
-                st.reason = if lit && !limited {
-                    Some("no series resistor — would burn out instantly (E33)".to_string())
-                } else if !lit {
-                    let anode_grounded = anode.as_ref().is_some_and(|n| grounded.contains(n));
-                    let cathode_hot = cathode.as_ref().is_some_and(|n| hot.contains(n));
-                    if anode_grounded && cathode_hot {
-                        Some("reverse polarity — anode is grounded, cathode is hot".to_string())
-                    } else if !anode_hot {
-                        Some("no power reaching the anode".to_string())
-                    } else {
-                        Some("cathode not returned to ground".to_string())
-                    }
-                } else {
-                    None
-                };
             }
             "motor" => {
-                let throttle = inputs.throttles.get(inst).copied().unwrap_or(0.0).clamp(-1.0, 1.0);
-                let motor_pins: Vec<String> =
-                    elec.pins.iter().filter(|(_, d)| d.role == "motor_in").map(|(p, _)| p.clone()).collect();
-                let mut spin = 0.0;
-                let mut amps = 0.0;
-                let mut reason = None;
-                if let Some(pin) = motor_pins.first() {
-                    let terminal = format!("{inst}.{pin}");
-                    match motor_output_pin(nl, cat, &terminal)? {
-                        Some(driver_pin) => {
-                            let (esc_inst, _) = split_pin(&driver_pin)?;
-                            if instance_powered(nl, cat, &net_of, &hot, &grounded, esc_inst)? {
-                                spin = throttle;
-                                let esc_part_id = nl
-                                    .instances
-                                    .get(esc_inst)
-                                    .ok_or_else(|| format!("unknown instance '{esc_inst}'"))?;
-                                let (esc_part, _) = cat.get(esc_part_id)?;
-                                if let Some(esc_elec) = &esc_part.elec {
-                                    if let Some(supply_net) =
-                                        pin_net_by_role(esc_elec, esc_inst, &net_of, "power_in")
-                                    {
-                                        if let Some(r_winding) = motor_winding_ohms(part) {
-                                            let v_actual = net_volts_live(&resolved_volts, &hot, &supply_net);
-                                            amps = throttle.abs() * v_actual / r_winding;
-                                            if amps > 0.0 {
-                                                sinks.push((supply_net, amps));
-                                                // Also the motor's own terminal wires — the
-                                                // same current visibly flows there too, not
-                                                // just upstream at the battery.
-                                                for p in &motor_pins {
-                                                    if let Some(n) = net_of.get(&format!("{inst}.{p}")) {
-                                                        sinks.push((n.clone(), amps));
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                reason = Some("driver channel unpowered".to_string());
-                            }
-                        }
-                        None => reason = Some("no single driver channel resolves (see E01)".to_string()),
-                    }
+                let (motor_state, motor_sinks) =
+                    crate::motor::compute(nl, cat, &net_of, &hot, &grounded, &resolved_volts, inputs, inst, part, elec)?;
+                st = motor_state;
+                if let Some(s) = motor_sinks {
+                    sinks.extend(s);
                 }
-                st.spin = Some(spin);
-                st.current_a = Some(amps);
-                st.reason = reason;
             }
             _ => {}
+        }
+
+        // An MCU is otherwise a plain fixed_power sink — this is the one
+        // thing distinct about it: which of its own pins actually drive
+        // something (an ESC channel, a servo), for the run panel to render
+        // a slider on the MCU's row per real signal path rather than one
+        // hardcoded to "throttle".
+        if part.kind == "mcu" {
+            st.pwm_channels = Some(
+                robowire::signal::mcu_drivable_pins(nl, cat, inst)?
+                    .into_iter()
+                    .map(|(pin, drives)| PwmChannel { pin, drives })
+                    .collect(),
+            );
         }
 
         instances.insert(inst.clone(), st);
@@ -354,32 +252,9 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
         );
     }
 
-    // Phase 6: battery's own current — the total on its own terminal net,
-    // knowable only now that `nets` (and its Σ of every sink) is built. Its
-    // terminal-voltage sag (`robowire::checks::battery_sag_v`) is derived
-    // from that same current, but is a ONE-SHOT display correction only:
-    // every other net's `volts`/`amps` above were already computed as if
-    // the battery's voltage were its undropped nominal figure, so feeding
-    // the sag back — even one hop, to something zero-resistance-bridged to
-    // the battery's own net — would show a number less consistent with the
-    // rest of the model than not showing it at all (the receiving net's
-    // `amps` was computed against the undropped voltage; propagating the
-    // drop without redoing that calculation doesn't actually make it more
-    // accurate). See `InstanceRunState.sag_v`'s doc comment.
-    for (inst, part_id) in &nl.instances {
-        let (part, _) = cat.get(part_id)?;
-        if part.kind != "battery" {
-            continue;
-        }
-        let Some(elec) = &part.elec else { continue };
-        let pos_net = pin_net_by_role(elec, inst, &net_of, "pos");
-        let amps = pos_net.and_then(|n| nets.get(&n)).map(|ns| ns.amps).unwrap_or(0.0);
-        let sag_v = elec.source.as_ref().and_then(|s| robowire::checks::battery_sag_v(s, amps));
-        if let Some(st) = instances.get_mut(inst) {
-            st.current_a = Some(amps);
-            st.sag_v = sag_v;
-        }
-    }
+    // Phase 6: battery finalization — its own current is only knowable now
+    // that `nets` (and its Σ of every sink) is built.
+    crate::battery::finalize(nl, cat, &net_of, &nets, &mut instances)?;
 
     Ok(RunState { nets, instances })
 }

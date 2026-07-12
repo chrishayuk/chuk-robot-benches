@@ -7,9 +7,11 @@
 use crate::schema::Net;
 
 /// (awg, ohms_per_meter, chassis_wiring_ampacity_a), ascending by gauge.
-/// Covers the range relevant to small-robot wiring (10-30 AWG) — an
-/// undeclared or out-of-range gauge yields `None` rather than a guess.
+/// Covers the range relevant to small-robot wiring (8-30 AWG; 8 AWG for
+/// weapon-motor leads whose stall current outruns what 10 AWG can carry) —
+/// an undeclared or out-of-range gauge yields `None` rather than a guess.
 const AWG_TABLE: &[(u32, f64, f64)] = &[
+    (8, 0.002061, 24.0),
     (10, 0.003277, 15.0),
     (12, 0.005210, 9.3),
     (14, 0.008284, 5.9),

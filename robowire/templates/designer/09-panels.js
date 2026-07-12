@@ -412,21 +412,36 @@
         const warn = c.pass && c.tier === "warn";
         const col = !c.pass ? "var(--bad)" : warn ? "var(--accent)" : "var(--ok)";
         const label = !c.pass ? "FAIL" : warn ? "WARN" : "PASS";
-        return `<div class="check"><span class="pill" style="background:${col}">${label}</span>` +
+        const clickable = teachMode ? ' style="cursor:pointer"' : "";
+        return `<div class="check" data-code="${c.code}"${clickable}><span class="pill" style="background:${col}">${label}</span>` +
           `<span>${c.code}</span><span class="d">${c.detail}</span></div>`;
       }).join("");
+      // Teaching mode: any check row (not just the currently-loaded lesson's
+      // own code) can be clicked to read its what/why/fix explanation —
+      // rebuilt fresh each tick, same as the rest of this panel, since a
+      // click here is a discrete action, not a gesture mid-drag (unlike the
+      // run panel's sliders, nothing here needs identity preserved).
+      if (teachMode) {
+        el.querySelectorAll(".check").forEach(row => {
+          row.addEventListener("click", () => {
+            teachFocusCode = row.dataset.code;
+            renderTeachPanel();
+          });
+        });
+      }
     }, 250);
   }
 
   function refresh() {
     nameEl.value = nl.name;
     renderLayers();
-    renderExamples();
+    if (teachMode) renderTeachLessons(); else renderExamples();
     renderPalette();
     renderNets();
     renderBuses();
     renderFailsafe();
     renderSelInfo();
+    renderTeachPanel();
     draw();
     runChecksSoon();
   }

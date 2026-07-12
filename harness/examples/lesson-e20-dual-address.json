@@ -1,0 +1,24 @@
+{
+  "name": "lesson-e20-dual-address",
+  "instances": {
+    "batt": "lipo-2s-260", "sw": "power-switch-slide", "reg": "reg-5v-mini",
+    "mcu": "rp2350-zero", "tof1": "vl53l0x-breakout", "tof2": "vl53l0x-breakout"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
+    { "id": "vbat", "pins": ["sw.out", "reg.VIN"], "volts": 7.4 },
+    { "id": "v5", "pins": ["reg.OUT", "mcu.5V"], "volts": 5.0 },
+    { "id": "v33", "pins": ["mcu.3V3", "tof1.VIN", "tof2.VIN"], "volts": 3.3 },
+    { "id": "gnd", "pins": ["batt.-", "reg.GND", "mcu.GND", "tof1.GND", "tof2.GND"] }
+  ],
+  "buses": [
+    {
+      "id": "i2c0", "kind": "i2c", "sda": "mcu.GP4", "scl": "mcu.GP5",
+      "devices": [
+        { "inst": "tof1", "addr": "0x29" },
+        { "inst": "tof2", "addr": "0x29" }
+      ]
+    }
+  ],
+  "failsafe": null
+}

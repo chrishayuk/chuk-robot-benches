@@ -28,12 +28,14 @@
       "S1": {
         "role": "signal_in",
         "signal": "pwm",
-        "required": true
+        "required": true,
+        "channel": "M1"
       },
       "S2": {
         "role": "signal_in",
         "signal": "pwm",
-        "required": true
+        "required": true,
+        "channel": "M2"
       },
       "M1+": {
         "role": "motor_out",

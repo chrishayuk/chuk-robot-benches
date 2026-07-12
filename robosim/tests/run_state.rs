@@ -128,7 +128,7 @@ fn led_current_scales_when_supply_voltage_changes() {
 fn motor_current_is_ohms_law_and_scales_with_supply_voltage() {
     let (nl, cat) = demo();
     let mut inputs = inputs_with_switch(true);
-    inputs.throttles.insert("m1".to_string(), 1.0);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 1.0);
     let st = run_state(&nl, &cat, &inputs).unwrap();
 
     // n20-motor-6v: stall_current_a=1.6, nominal_v=6.0 -> r_winding = 3.75Ω.
@@ -152,10 +152,30 @@ fn motor_current_is_ohms_law_and_scales_with_supply_voltage() {
 }
 
 #[test]
+fn motor_reports_powered_independent_of_throttle() {
+    // A motor's ESC channel can be powered while sitting at zero throttle —
+    // a distinct, visible state from "no power reaching it at all" (the
+    // same distinction switch/LED already draw via `closed`/`lit`), not
+    // something only a spin animation (which needs nonzero throttle) shows.
+    let (nl, cat) = demo();
+
+    let mut idle = inputs_with_switch(true);
+    idle.pwm_signals.insert("mcu.GP2".to_string(), 0.0);
+    let st = run_state(&nl, &cat, &idle).unwrap();
+    assert_eq!(st.instances["m1"].powered, Some(true), "powered rail, zero throttle -> still powered");
+    assert_eq!(st.instances["m1"].spin, Some(0.0));
+
+    let off = inputs_with_switch(false);
+    let st_off = run_state(&nl, &cat, &off).unwrap();
+    assert_eq!(st_off.instances["m1"].powered, Some(false), "switch open -> motor's own channel unpowered");
+    assert_eq!(st_off.instances["m1"].reason.as_deref(), Some("driver channel unpowered"));
+}
+
+#[test]
 fn motor_current_also_shows_on_its_own_terminal_wires() {
     let (nl, cat) = demo();
     let mut inputs = inputs_with_switch(true);
-    inputs.throttles.insert("m1".to_string(), 0.7);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.7);
     let st = run_state(&nl, &cat, &inputs).unwrap();
 
     // The current visibly flowing INTO the motor (m1_a/m1_b, its own two
@@ -183,7 +203,7 @@ fn fixed_power_device_current_matches_its_equivalent_resistance() {
 fn battery_current_is_the_sum_of_every_live_load() {
     let (nl, cat) = demo();
     let mut inputs = inputs_with_switch(true);
-    inputs.throttles.insert("m1".to_string(), 0.7);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.7);
     let st = run_state(&nl, &cat, &inputs).unwrap();
 
     let esc_amps = 15.0_f64 / 1000.0 * (7.4 / 7.4);
@@ -205,7 +225,7 @@ fn battery_current_is_the_sum_of_every_live_load() {
 fn battery_terminal_voltage_sags_proportional_to_its_own_current() {
     let (nl, cat) = demo();
     let mut inputs = inputs_with_switch(true);
-    inputs.throttles.insert("m1".to_string(), 0.7);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.7);
     let st = run_state(&nl, &cat, &inputs).unwrap();
 
     // lipo-2s-260 declares r_internal_ohm = 0.18.
@@ -275,8 +295,8 @@ fn switch_open_voltage_present_at_battery_terminal_only() {
 fn mvp_wedge_motors_spin_independently_by_channel() {
     let (nl, cat) = wedge();
     let mut inputs = inputs_with_switch(true);
-    inputs.throttles.insert("m_l".to_string(), 0.5);
-    inputs.throttles.insert("m_r".to_string(), -0.3);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.5);
+    inputs.pwm_signals.insert("mcu.GP3".to_string(), -0.3);
     let st = run_state(&nl, &cat, &inputs).unwrap();
     assert_eq!(st.instances["m_l"].spin, Some(0.5));
     assert_eq!(st.instances["m_r"].spin, Some(-0.3));
@@ -284,6 +304,42 @@ fn mvp_wedge_motors_spin_independently_by_channel() {
     // uses abs() so both draw current).
     assert!(st.instances["m_l"].current_a.unwrap() > 0.0);
     assert!(st.instances["m_r"].current_a.unwrap() > 0.0);
+}
+
+#[test]
+fn mvp_wedge_signal_is_pinned_to_the_mcu_pin_not_the_motor() {
+    // Only GP2 gets a value — GP3 (m_r's own channel) never does. If this
+    // were still keyed by motor instance, both would independently take
+    // whatever was set for them; keyed by MCU pin, m_r must stay at rest
+    // since nothing actually drives esc.S2.
+    let (nl, cat) = wedge();
+    let mut inputs = inputs_with_switch(true);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.8);
+    let st = run_state(&nl, &cat, &inputs).unwrap();
+    assert_eq!(st.instances["m_l"].spin, Some(0.8));
+    assert_eq!(st.instances["m_r"].spin, Some(0.0));
+
+    // The MCU itself reports which of its own pins are wired to drive a
+    // motor, and which — same run's mcu.GP2 -> m_l, mcu.GP3 -> m_r.
+    let channels = st.instances["mcu"].pwm_channels.as_ref().unwrap();
+    assert!(channels.iter().any(|c| c.pin == "GP2" && c.drives.as_deref() == Some("m_l")));
+    assert!(channels.iter().any(|c| c.pin == "GP3" && c.drives.as_deref() == Some("m_r")));
+}
+
+#[test]
+fn stage2_motor_driver_never_spins_without_a_brain_wired_up() {
+    // harness/lessons/02-motor-driver.json has a real, powered ESC+motor but
+    // no MCU at all — esc.S1 sits on a dummy single-pin net. Setting a pwm
+    // signal for a pin that isn't even in this netlist must have no effect:
+    // the motor is powered (the rail reaches it) but never spins, and says
+    // exactly why, rather than quietly taking whatever value is handed to it.
+    let (nl, cat) = load("harness/lessons/02-motor-driver.json");
+    let mut inputs = inputs_with_switch(true);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 1.0);
+    let st = run_state(&nl, &cat, &inputs).unwrap();
+    assert_eq!(st.instances["m1"].powered, Some(true));
+    assert_eq!(st.instances["m1"].spin, Some(0.0));
+    assert_eq!(st.instances["m1"].reason.as_deref(), Some("no signal source wired to this channel"));
 }
 
 #[test]
@@ -392,4 +448,27 @@ fn net_with_no_gauge_has_no_wire_drop() {
     let st = run_state(&nl, &cat, &inputs_with_switch(true)).unwrap();
     assert!(st.nets["v33"].amps > 0.0);
     assert!(st.nets["v33"].wire_drop_v.is_none(), "no gauge/length declared — must not fabricate a drop");
+}
+
+#[test]
+fn bare_led_reports_burned_a_protected_led_does_not() {
+    // burned == lit && !current_limited (crate::led) — a real consequence
+    // of E33's own failure condition, not a rendering-layer inference.
+    let (nl, cat) = load("harness/lessons/01-basics-broken.json");
+    let st = run_state(&nl, &cat, &inputs_with_switch(true)).unwrap();
+    assert_eq!(st.instances["led1"].lit, Some(true));
+    assert_eq!(st.instances["led1"].current_limited, Some(false));
+    assert_eq!(st.instances["led1"].burned, Some(true), "an unprotected, powered LED must report burned");
+
+    let (nl, cat) = load("harness/lessons/01-basics.json");
+    let st = run_state(&nl, &cat, &inputs_with_switch(true)).unwrap();
+    assert_eq!(st.instances["led1"].lit, Some(true));
+    assert_eq!(st.instances["led1"].current_limited, Some(true));
+    assert_eq!(st.instances["led1"].burned, Some(false), "a properly current-limited LED must not report burned");
+
+    // Switch open: not lit, so not burned either, regardless of protection.
+    let (nl, cat) = load("harness/lessons/01-basics-broken.json");
+    let st = run_state(&nl, &cat, &inputs_with_switch(false)).unwrap();
+    assert_eq!(st.instances["led1"].lit, Some(false));
+    assert_eq!(st.instances["led1"].burned, Some(false), "an unpowered LED isn't burning, protected or not");
 }

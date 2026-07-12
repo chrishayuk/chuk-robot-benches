@@ -1,0 +1,14 @@
+{
+  "id": "removable-link",
+  "kind": "switch",
+  "mass_g": 0.8,
+  "provisional": true,
+  "notes": "a removable jumper/link in the battery-positive path (E40) — physically pulled out rather than flipped, but electrically (and in run mode) it plays the same on/off role as a physical switch.",
+  "elec": {
+    "pins": {
+      "in": { "role": "switch_in", "required": true },
+      "out": { "role": "switch_out", "required": true }
+    }
+  },
+  "description": "A removable link: pull it out and the robot is provably dead, with nothing to flip or trust to actually be off. A common alternative to a physical switch on antweights — same tech-check requirement (E40), same role in the circuit."
+}

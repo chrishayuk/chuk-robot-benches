@@ -106,6 +106,7 @@
   <button id="importBtn">import</button>
   <button id="exportBtn" class="primary">export netlist</button>
   <button id="runBtn">run mode</button>
+  <button id="teachBtn">teaching mode</button>
 </header>
 <div id="left">
   <h2>layers</h2>
@@ -119,6 +120,7 @@
 <canvas id="board"></canvas>
 <div id="right">
   <div id="runPanel" style="display:none"></div>
+  <div id="teachPanel" style="display:none;border:1px solid var(--accent);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.5"></div>
   <div id="verdict"></div>
   <div id="checks"></div>
   <div id="selinfo" style="display:none"></div>
@@ -151,6 +153,9 @@ const START_NETLIST =
 null;
 const EXAMPLES =
 //__EXAMPLES__
+[];
+const LESSONS =
+//__LESSONS__
 [];
 const WASM_B64 =
 //__WASM__

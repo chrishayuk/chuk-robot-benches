@@ -44,11 +44,17 @@
   // calls draw() before module 12 has run, so these must be live before
   // that (function declarations hoist fully; `let` does not).
   let runMode = false;
-  let runInputs = { switches: {}, buttons: {}, throttles: {}, sensor_values: {} };
+  let runInputs = { switches: {}, buttons: {}, pwm_signals: {}, sensor_values: {} };
   let runState = { nets: {}, instances: {} };
   let heldButtonInst = null;
   let spinPhase = 0;
   let spinRAF = null;
+  // Teaching mode (13-teach.js) — same early-declaration reason as runMode
+  // above: refresh() (called from 11-boot.js's synchronous startup tail)
+  // calls renderExamples()/runChecksSoon(), both of which read teachMode
+  // before module 13 has run.
+  let teachMode = false;
+  let teachFocusCode = null;
   let pending = null;       // first pin clicked in wire mode
   let pickHandler = null;   // active pin-pick flow (bus/failsafe forms)
   let selNet = -1;
