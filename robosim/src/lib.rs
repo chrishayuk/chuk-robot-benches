@@ -22,8 +22,8 @@
 //!   module the same way as they need more than a couple of lines.
 //! - `motor` — the motor component's own behavior (driver-channel
 //!   resolution, powered/spin/current_a/reason).
-//! - `sensor` — the tof/imu component's own behavior (fake reading,
-//!   bus-address conflict, current draw).
+//! - `sensor` — the tof/imu/light/env component's own behavior (fake
+//!   reading, bus-address conflict, current draw).
 //! - `fixed_power` — the shared behavior of every kind whose current draw
 //!   is simply `equiv_load_current` against its own `power_in` net when
 //!   powered (regulator/esc/mcu/radio/buzzer/servo) — genuinely identical

@@ -51,7 +51,7 @@ pub fn compute(
                 powered = Some(esc_powered);
                 if esc_powered {
                     // Throttle comes from whichever MCU pin actually reaches
-                    // this channel's signal-in pin (harness/lessons/02-motor-driver.json
+                    // this channel's signal-in pin (harness/lessons/03-motor-driver.json
                     // has none yet, and correctly never spins as a result) —
                     // not pinned directly to the motor instance, so a wiring
                     // mistake between the brain and the ESC shows up here too.

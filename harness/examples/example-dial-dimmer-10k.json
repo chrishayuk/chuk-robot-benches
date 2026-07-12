@@ -1,11 +1,16 @@
 {
-  "name": "01-basics",
-  "instances": { "batt": "lipo-2s-260", "sw": "power-switch-slide", "pot": "potentiometer-1k", "led1": "led-red-5mm" },
+  "name": "example-dial-dimmer-10k",
+  "instances": {
+    "batt": "lipo-2s-260",
+    "sw": "power-switch-slide",
+    "pot": "potentiometer-10k",
+    "led1": "led-red-5mm"
+  },
   "nets": [
     { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
     { "id": "feed", "pins": ["sw.out", "pot.P1"], "volts": 7.4 },
     { "id": "led_feed", "pins": ["pot.P2", "led1.A"] },
-    { "id": "gnd", "pins": ["led1.K", "batt.-"] }
+    { "id": "gnd", "pins": ["batt.-", "led1.K"] }
   ],
   "buses": [],
   "failsafe": null

@@ -33,6 +33,14 @@ pub struct MotorProps {
     /// voltage and throttle, Ohm's law, rather than a fixed figure.
     #[serde(default)]
     pub nominal_v: Option<f64>,
+    /// "brushed" | "brushless" — a structured, checkable fact (robowire E05:
+    /// a motor's winding type must match its driving ESC's own declared
+    /// `EscProps::supports_winding`) rather than something only readable in
+    /// a part's free-text `notes`. `None` for a provisional entry that
+    /// hasn't been classified yet — E05 skips a motor/ESC pair where either
+    /// side leaves this unset, rather than guessing.
+    #[serde(default)]
+    pub winding: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -40,6 +48,20 @@ pub struct TyreProps {
     pub mu_min: f64,
     pub mu_max: f64,
     pub mu_kinetic_ratio: f64,
+}
+
+/// ESC-specific structured data — parallel to `MotorProps`/`TyreProps`, not
+/// folded into `Elec`, since it's a drive-model fact rather than a wiring one.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct EscProps {
+    /// "brushed" | "brushless" — which motor winding type this ESC's own
+    /// internal driver circuit actually supports. The two are genuinely
+    /// different circuits (a brushless ESC commutates three phases; a
+    /// brushed ESC just switches DC polarity/PWM) — wiring the wrong motor
+    /// to an ESC isn't a "might work worse" mismatch, it's "won't spin at
+    /// all," exactly the kind of statically-detectable failure robowire
+    /// exists to catch (E05).
+    pub supports_winding: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +146,8 @@ pub struct Part {
     #[serde(default)]
     pub tyre: Option<TyreProps>,
     #[serde(default)]
+    pub esc: Option<EscProps>,
+    #[serde(default)]
     pub elec: Option<Elec>,
     /// Rated current draw in mA at `nominal_v` — together they let robowire's
     /// run mode derive an equivalent resistance (`nominal_v / (current_ma/1000)`)
@@ -165,6 +189,16 @@ pub struct Part {
     /// limit (a fuse's own resistance is ~irrelevant next to its rating).
     #[serde(default)]
     pub rated_a: Option<f64>,
+    /// Named live readings this sensor reports simultaneously (e.g. a
+    /// BME280's `["temp_c", "humidity_pct", "pressure_hpa"]`) — one real
+    /// physical part, several independent numbers, not one. `None`/empty
+    /// means this sensor reports a single reading instead
+    /// (`InstanceRunState.value`, e.g. a ToF's one distance) — robosim's
+    /// `sensor` module branches on whether this is populated, so a sensor
+    /// part just declares its own shape here rather than the run-mode
+    /// projection guessing at it.
+    #[serde(default)]
+    pub readings: Option<Vec<String>>,
     #[serde(default)]
     pub provisional: bool,
     #[serde(default)]

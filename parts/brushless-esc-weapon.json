@@ -15,5 +15,8 @@
       "M1+": { "role": "motor_out", "channel": "M1" },
       "M1-": { "role": "motor_out", "channel": "M1" }
     }
+  },
+  "esc": {
+    "supports_winding": "brushless"
   }
 }

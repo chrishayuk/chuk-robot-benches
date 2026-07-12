@@ -23,9 +23,20 @@ pub struct RunInputs {
     /// live resistance between the part's declared ohms_min and ohms_max.
     #[serde(default)]
     pub dial_positions: BTreeMap<String, f64>,
-    /// tof/imu instance -> user-set fake reading
+    /// tof/imu/light instance -> user-set fake reading, for sensors that
+    /// report exactly one value (see `roboparts::Part::readings` — `None`
+    /// there means this map is what's used).
     #[serde(default)]
     pub sensor_values: BTreeMap<String, f64>,
+    /// sensor instance -> named reading -> user-set fake value, for a part
+    /// that reports SEVERAL simultaneous readings from one physical device
+    /// (`roboparts::Part::readings`, e.g. a BME280's own
+    /// `["temp_c", "humidity_pct", "pressure_hpa"]`) — kept as a distinct
+    /// map from `sensor_values` rather than compound-keying the same one,
+    /// so a single-reading sensor's plain instance-name key can never
+    /// collide with a multi-reading sensor's own reading names.
+    #[serde(default)]
+    pub sensor_readings: BTreeMap<String, BTreeMap<String, f64>>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -77,8 +88,18 @@ pub struct InstanceRunState {
     pub burned: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spin: Option<f64>,
+    /// A single-reading sensor's (tof/imu/light) live value — `None` for a
+    /// multi-reading sensor, which reports through `readings` instead.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<f64>,
+    /// A multi-reading sensor's (`roboparts::Part::readings` non-empty,
+    /// e.g. `env`) named live values — one physical part, several
+    /// independent numbers at once, rather than one collapsed reading.
+    /// `None` for a single-reading sensor, which reports through `value`
+    /// instead; exactly one of the two is ever populated for a given
+    /// instance.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub readings: Option<BTreeMap<String, f64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bus_conflict: Option<bool>,
     /// Live current draw in amps, Ohm's law against the actual voltage this

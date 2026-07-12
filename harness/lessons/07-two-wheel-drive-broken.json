@@ -1,0 +1,37 @@
+{
+  "name": "07-two-wheel-drive-broken",
+  "instances": {
+    "batt": "lipo-2s-260", "sw": "power-switch-slide", "esc": "bbb-dual-esc", "m1": "n20-motor-6v",
+    "m2": "n20-motor-6v", "mcu": "rp2350-zero", "rx": "elrs-rx", "lifter": "servo-9g-lifter",
+    "tof1": "vl53l0x-breakout", "tof2": "vl53l0x-breakout", "light": "line-sensor-analog", "env": "env-bme280"
+  },
+  "nets": [
+    {"id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4},
+    {"id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 7.4},
+    {"id": "v5", "pins": ["esc.BEC5V", "mcu.5V", "rx.VIN", "lifter.+"], "volts": 5.0},
+    {"id": "v33", "pins": ["mcu.3V3", "tof1.VIN", "tof2.VIN", "light.VIN", "env.VIN"], "volts": 3.3},
+    {"id": "gnd", "pins": ["batt.-", "esc.GND", "mcu.GND", "rx.GND", "lifter.-", "tof1.GND", "tof2.GND", "light.GND", "env.GND"]},
+    {"id": "m1_a", "pins": ["esc.M1+", "m1.M+"]},
+    {"id": "m1_b", "pins": ["esc.M1-", "m1.M-"]},
+    {"id": "m2_ab", "pins": ["esc.M2+", "m2.M+", "m2.M-"]},
+    {"id": "pwm_l", "pins": ["mcu.GP2", "esc.S1"], "signal": "pwm"},
+    {"id": "pwm_r", "pins": ["mcu.GP7", "esc.S2"], "signal": "pwm"},
+    {"id": "crsf", "pins": ["rx.TX", "mcu.GP1"], "signal": "uart"},
+    {"id": "lifter_sig", "pins": ["mcu.GP3", "lifter.SIG"], "signal": "pwm"},
+    {"id": "light_sig", "pins": ["mcu.GP8", "light.OUT"], "signal": "analog"}
+  ],
+  "buses": [
+    {
+      "id": "i2c0", "kind": "i2c", "sda": "mcu.GP4", "scl": "mcu.GP5",
+      "devices": [
+        {"inst": "tof1", "addr": "0x29", "reassign_to": "0x2A", "xshut": "mcu.GP6"},
+        {"inst": "tof2", "addr": "0x29"},
+        {"inst": "env", "addr": "0x76"}
+      ]
+    }
+  ],
+  "failsafe": {
+    "rx_loss": "CRSF failsafe frames -> kernel commands neutral -> ESC S1/S2 driven to neutral by MCU; ESC self-cuts on signal loss",
+    "stop_pins": ["esc.S1", "esc.S2"]
+  }
+}

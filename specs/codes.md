@@ -13,6 +13,7 @@ here first, then a check in the owning tool. Codes are never renumbered or reuse
 | E02 | power pins reach a rail of legal voltage (catalogue range) | fail |
 | E03 | polarity continuity — no +/− swap reachable through the net graph | fail |
 | E04 | no floating required pins | fail |
+| E05 | motor winding type (brushed/brushless) matches its driving ESC's declared support | fail |
 | E10 | MCU nets use pins with required capability (PWM/ADC/UART/I²C) | fail |
 | E11 | no pin double-booked; no muxed-function capability conflicts | fail |
 | E20 | I²C address collisions after reassignment plan (dual-0x29 classic) | fail |

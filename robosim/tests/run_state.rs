@@ -10,6 +10,7 @@
 use robowire::catalogue::ElecCatalogue;
 use robowire::Netlist;
 use robosim::{run_state, RunInputs};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 const EPS: f64 = 1e-6;
@@ -39,6 +40,10 @@ fn dimmer() -> (Netlist, ElecCatalogue) {
 
 fn wedge() -> (Netlist, ElecCatalogue) {
     load("harness/mvp-wedge-harness.json")
+}
+
+fn sensors_demo() -> (Netlist, ElecCatalogue) {
+    load("harness/examples/example-sensors-demo.json")
 }
 
 fn inputs_with_switch(closed: bool) -> RunInputs {
@@ -327,13 +332,13 @@ fn mvp_wedge_signal_is_pinned_to_the_mcu_pin_not_the_motor() {
 }
 
 #[test]
-fn stage2_motor_driver_never_spins_without_a_brain_wired_up() {
-    // harness/lessons/02-motor-driver.json has a real, powered ESC+motor but
+fn stage3_motor_driver_never_spins_without_a_brain_wired_up() {
+    // harness/lessons/03-motor-driver.json has a real, powered ESC+motor but
     // no MCU at all — esc.S1 sits on a dummy single-pin net. Setting a pwm
     // signal for a pin that isn't even in this netlist must have no effect:
     // the motor is powered (the rail reaches it) but never spins, and says
     // exactly why, rather than quietly taking whatever value is handed to it.
-    let (nl, cat) = load("harness/lessons/02-motor-driver.json");
+    let (nl, cat) = load("harness/lessons/03-motor-driver.json");
     let mut inputs = inputs_with_switch(true);
     inputs.pwm_signals.insert("mcu.GP2".to_string(), 1.0);
     let st = run_state(&nl, &cat, &inputs).unwrap();
@@ -471,4 +476,116 @@ fn bare_led_reports_burned_a_protected_led_does_not() {
     let st = run_state(&nl, &cat, &inputs_with_switch(false)).unwrap();
     assert_eq!(st.instances["led1"].lit, Some(false));
     assert_eq!(st.instances["led1"].burned, Some(false), "an unpowered LED isn't burning, protected or not");
+}
+
+#[test]
+fn light_and_env_sensors_share_tof_imu_shape_with_no_new_component_module() {
+    // line-sensor-analog (kind "light", not on any bus) and env-bme280
+    // (kind "env", on the I2C bus alongside tof-longrange) both go through
+    // the exact same `sensor::compute` path as tof/imu — proving that
+    // reusing the dispatch arm (no new component module) actually works,
+    // not just compiles.
+    let (nl, cat) = sensors_demo();
+    let st = run_state(&nl, &cat, &inputs_with_switch(true)).unwrap();
+
+    // light1 has no declared `readings` — single-value shape, same as
+    // tof/imu; defaults to 0 (no range_mm declared).
+    assert_eq!(st.instances["light1"].value, Some(0.0));
+    assert_eq!(st.instances["light1"].readings, None);
+
+    // env-bme280 declares three named readings — one physical part, three
+    // independent numbers, not one collapsed value.
+    assert_eq!(st.instances["env1"].value, None);
+    let env_readings = st.instances["env1"].readings.as_ref().unwrap();
+    assert_eq!(env_readings.len(), 3);
+    assert_eq!(env_readings.get("temp_c"), Some(&0.0));
+    assert_eq!(env_readings.get("humidity_pct"), Some(&0.0));
+    assert_eq!(env_readings.get("pressure_hpa"), Some(&0.0));
+
+    // Current draw is real Ohm's-law-equivalent math against each part's
+    // OWN declared rail, not a shared/fixed number: light1 off v33 (3.3V),
+    // env1 off v33 (3.3V), tof1 off v5 (5.0V) — a genuinely different rail.
+    assert!(close(st.instances["light1"].current_a.unwrap(), 10.0 / 1000.0));
+    assert!(close(st.instances["env1"].current_a.unwrap(), 1.0 / 1000.0));
+    assert!(close(st.instances["tof1"].current_a.unwrap(), 80.0 / 1000.0));
+
+    // tof1/env1 share the I2C bus at different addresses (0x10 vs 0x76) —
+    // no conflict. light1 isn't on any bus at all, so bus_conflict is
+    // untouched (None), not a spurious `Some(false)`.
+    assert_eq!(st.instances["tof1"].bus_conflict, Some(false));
+    assert_eq!(st.instances["env1"].bus_conflict, Some(false));
+    assert_eq!(st.instances["light1"].bus_conflict, None);
+
+    // A user-set fake reading round-trips through inputs.sensor_values same
+    // as any tof/imu instance.
+    let mut inputs = inputs_with_switch(true);
+    inputs.sensor_values.insert("light1".to_string(), 42.0);
+    let st2 = run_state(&nl, &cat, &inputs).unwrap();
+    assert_eq!(st2.instances["light1"].value, Some(42.0));
+
+    // Each of env1's named readings is independently settable, and the
+    // other two stay at their own default when only one is set.
+    let mut inputs2 = inputs_with_switch(true);
+    let mut env_set = BTreeMap::new();
+    env_set.insert("temp_c".to_string(), 21.5);
+    inputs2.sensor_readings.insert("env1".to_string(), env_set);
+    let st3 = run_state(&nl, &cat, &inputs2).unwrap();
+    let readings3 = st3.instances["env1"].readings.as_ref().unwrap();
+    assert_eq!(readings3.get("temp_c"), Some(&21.5));
+    assert_eq!(readings3.get("humidity_pct"), Some(&0.0));
+    assert_eq!(readings3.get("pressure_hpa"), Some(&0.0));
+}
+
+#[test]
+fn stage1_basics_potentiometer_is_playable_live() {
+    // 01-basics uses a potentiometer instead of a fixed resistor precisely
+    // so the very first lesson is something to drag and watch change, not
+    // just a single static data point — same math as example-dial-dimmer's
+    // own dial test, proving the substitution didn't just compile but
+    // actually behaves like a real variable resistor in run mode.
+    let (nl, cat) = load("harness/lessons/01-basics.json");
+    let mut inputs = inputs_with_switch(true);
+
+    // potentiometer-1k: ohms_min=100, ohms_max=1000. led-red-5mm forward_v=2.0.
+    // Fed from "feed" (7.4V, declared). I = (V - Vf) / R.
+    let expected = |dial: f64| -> f64 {
+        let ohms = 100.0 + (1000.0 - 100.0) * dial;
+        (7.4 - 2.0) / ohms
+    };
+
+    for dial in [0.0, 0.5, 1.0] {
+        inputs.dial_positions.insert("pot".to_string(), dial);
+        let st = run_state(&nl, &cat, &inputs).unwrap();
+        let actual = st.instances["led1"].current_a.unwrap();
+        let want = expected(dial);
+        assert!(close(actual, want), "dial={dial}: current_a = {actual}, expected {want}");
+        assert_eq!(st.instances["led1"].current_limited, Some(true), "still E33-legal at every dial position");
+    }
+}
+
+#[test]
+fn solar_panel_never_seeds_the_hot_graph_by_design() {
+    // energy-sim.md §2.1: a solar-panel has no `elec.source` and no power_in
+    // pin at all, so it deliberately never becomes a battery-style seed or a
+    // passthrough candidate in robosim's boolean hot/grounded graph — its
+    // whole electrical presence here is a single power_out pin, checked
+    // statically by robowire (E02/E30) but otherwise inert in run mode until
+    // a real time-domain energy model exists. This proves that inertness is
+    // honest (no crash, no spurious "powered") rather than accidental.
+    let (nl, cat) = load("harness/examples/example-solar-charging-demo.json");
+    let st = run_state(&nl, &cat, &inputs_with_switch(true)).unwrap();
+
+    // The LED load still works normally off the real battery seed — the
+    // solar/charge-controller side existing at all doesn't disturb it.
+    assert_eq!(st.instances["led1"].lit, Some(true));
+    assert_eq!(st.instances["led1"].current_limited, Some(true));
+
+    // charge-controller's own "powered" reflects its INPUT (panel) side,
+    // which nothing seeds — honestly unpowered, not a stale/wrong true.
+    assert_eq!(st.instances["cc"].powered, Some(false));
+
+    // The battery itself is unaffected by the charge controller feeding
+    // (electrically) the same net as its own terminal — still just the
+    // normal battery projection.
+    assert!(st.instances["batt"].current_a.unwrap() > 0.0);
 }

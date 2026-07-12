@@ -19,7 +19,7 @@ const exactlyOne = [
   "function syncBuzzers(", "function startBuzzer(", "function stopBuzzer(",
   "function enterTeachMode()", "function exitTeachMode()", "function renderTeachPanel()",
   "function renderTeachLessons()", "function parseLessonName(", "function drawBurnedLed(",
-  "function setPwmSignal(",
+  "function setPwmSignal(", "function setSensorReading(",
 ];
 for (const k of exactlyOne) {
   if (count(k) !== 1) fail(`expected exactly one '${k}', found ${count(k)}`);

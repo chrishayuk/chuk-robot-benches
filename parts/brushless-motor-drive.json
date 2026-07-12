@@ -1,0 +1,21 @@
+{
+  "id": "brushless-motor-drive",
+  "kind": "motor",
+  "mass_g": 12.0,
+  "provisional": true,
+  "notes": "small direct-drive (ungeared) brushless propulsion motor — unlike n20-motor-6v, there's no integrated gearbox, so it trades torque for RPM: lower stall torque, much higher no-load speed. A real build would usually still gear or belt-reduce this for a sensible wheel speed; that reduction isn't modelled here, just the motor's own electrical draw.",
+  "elec": {
+    "pins": {
+      "M+": { "role": "motor_in", "required": true },
+      "M-": { "role": "motor_in", "required": true }
+    }
+  },
+  "description": "A small brushless drive motor — an alternative to a brushed N20 gearmotor for propulsion: better power-to-weight, needs its own brushless ESC (not the brushed dual-ESC), and no gearbox of its own.",
+  "motor": {
+    "stall_torque_mnm": 15.0,
+    "no_load_rpm": 15000.0,
+    "stall_current_a": 3.5,
+    "nominal_v": 11.1,
+    "winding": "brushless"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "example-solar-charging-demo",
+  "instances": {
+    "batt": "lipo-2s-260", "sw": "power-switch-slide",
+    "panel": "solar-panel-9v-2w", "cc": "charge-controller-small",
+    "r1": "resistor-330r", "led1": "led-red-5mm"
+  },
+  "nets": [
+    { "id": "panel_out", "pins": ["panel.OUT", "cc.VIN"], "volts": 9.0 },
+    { "id": "vbat_sw", "pins": ["batt.+", "cc.OUT", "sw.in"], "volts": 7.4 },
+    { "id": "feed", "pins": ["sw.out", "r1.P1"], "volts": 7.4 },
+    { "id": "led_feed", "pins": ["r1.P2", "led1.A"] },
+    { "id": "gnd", "pins": ["batt.-", "panel.GND", "cc.GND", "led1.K"] }
+  ],
+  "buses": [],
+  "failsafe": null
+}

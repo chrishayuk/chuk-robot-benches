@@ -37,17 +37,47 @@ fn wedge_mcu_drivable_pins_reports_both_channels_and_their_motors() {
 }
 
 #[test]
-fn stage2_motor_driver_has_no_signal_source_yet() {
-    // harness/lessons/02-motor-driver.json deliberately has no MCU — S1 sits
+fn stage3_motor_driver_has_no_signal_source_yet() {
+    // harness/lessons/03-motor-driver.json deliberately has no MCU — S1 sits
     // on a dummy single-pin net. A real, legal circuit state, not an error.
-    let (nl, cat) = load("harness/lessons/02-motor-driver.json");
+    let (nl, cat) = load("harness/lessons/03-motor-driver.json");
     assert_eq!(motor_signal_source_pin(&nl, &cat, "m1.M+").unwrap(), None);
 }
 
 #[test]
-fn stage3_brain_and_radio_wires_the_signal_through() {
-    let (nl, cat) = load("harness/lessons/03-brain-and-radio.json");
+fn stage4_brain_and_radio_wires_the_signal_through() {
+    let (nl, cat) = load("harness/lessons/04-brain-and-radio.json");
     assert_eq!(motor_signal_source_pin(&nl, &cat, "m1.M+").unwrap().as_deref(), Some("mcu.GP2"));
+}
+
+#[test]
+fn a_servo_with_no_channel_is_labeled_by_its_own_instance_not_unconnected() {
+    // A servo's SIG pin has no `channel` (unlike an ESC's S1/S2, one per
+    // motor channel) — the previous version of `driven_inst` only knew how
+    // to trace through a channel to a motor, so a servo's own drivable pin
+    // fell through to `None` ("unconnected downstream") even though it
+    // plainly IS connected, just not to a motor. Stage 5 introduces the
+    // lifter servo on mcu.GP3.
+    let (nl, cat) = load("harness/lessons/05-shared-5v-rail.json");
+    let pins = mcu_drivable_pins(&nl, &cat, "mcu").unwrap();
+    assert_eq!(
+        pins,
+        vec![("GP2".to_string(), Some("m1".to_string())), ("GP3".to_string(), Some("lifter".to_string()))]
+    );
+}
+
+#[test]
+fn stage7_two_wheel_drive_resolves_both_motors_and_the_servo() {
+    let (nl, cat) = load("harness/lessons/07-two-wheel-drive.json");
+    let pins = mcu_drivable_pins(&nl, &cat, "mcu").unwrap();
+    assert_eq!(
+        pins,
+        vec![
+            ("GP2".to_string(), Some("m1".to_string())),
+            ("GP3".to_string(), Some("lifter".to_string())),
+            ("GP7".to_string(), Some("m2".to_string())),
+        ]
+    );
 }
 
 #[test]

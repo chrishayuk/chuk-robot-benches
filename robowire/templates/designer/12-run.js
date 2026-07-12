@@ -162,11 +162,16 @@
   // (regulator/esc/radio/buzzer/servo) fall through to each call site's
   // generic default (a plain readout span showing "powered/unpowered ·
   // X.XXA"; no overlay) — genuinely identical behavior across those five,
-  // not worth a registry entry each. `mcu` gets its own entry below (its
-  // drivable pins are the run-mode signal source for a motor's throttle),
-  // but still falls through to that same generic readout for its own
-  // powered/current status, having no `updateReadout` of its own.
+  // not worth a registry entry each.
+  //
+  // Each entry is tagged below with what it IS in run mode, not just what
+  // kind it happens to be — the same input/output split as the palette's
+  // PART_GROUPS: "input" = a human (or the MCU's own slider, standing in
+  // for a signal generator) drives a value INTO the circuit; "sensor" = a
+  // fake environmental reading, also user-set but read FROM the world, not
+  // driven; "output" = what the circuit shows back — a light, a spin.
   const RUN_COMPONENTS = {
+    // input — the switch's own open/closed state.
     switch: {
       defaultInput: (inst, part, inputs) => { inputs.switches[inst] = false; },
       handlePointerDown: (inst) => { toggleSwitch(inst); return true; },
@@ -177,6 +182,7 @@
       drawOverlay2d: (inst, g, s) => closedOutline2d(g, s),
       drawOverlay3d: (inst, q, s) => closedDot3d(q, s),
     },
+    // input — held down or not, while the pointer is down on it.
     button: {
       defaultInput: (inst, part, inputs) => { inputs.buttons[inst] = false; },
       handlePointerDown: (inst) => { heldButtonInst = inst; setButtonHeld(inst, true); return true; },
@@ -187,6 +193,8 @@
       drawOverlay2d: (inst, g, s) => closedOutline2d(g, s),
       drawOverlay3d: (inst, q, s) => closedDot3d(q, s),
     },
+    // output — an actuator, not a light or sound, but still something the
+    // circuit DOES rather than something a human drives into it directly.
     motor: {
       // No slider of its own: a motor's throttle is commanded by whichever
       // MCU pin its driver channel actually resolves to (see the `mcu`
@@ -242,6 +250,8 @@
         }
       },
     },
+    // input — the dial position, dragged live (a variable resistor
+    // electrically, but the thing a human is actually operating here).
     potentiometer: {
       defaultInput: (inst, part, inputs) => { inputs.dial_positions[inst] = 0.5; },
       panelControl: (inst) =>
@@ -254,13 +264,38 @@
         refs.readout.textContent = `${Math.round((runInputs.dial_positions[inst] ?? 0.5) * 100)}%`;
       },
     },
+    // sensor — a fake environmental reading, still user-set (there's no
+    // real world here) but read FROM it rather than driven into the
+    // circuit like switch/button/potentiometer/mcu above.
     tof: {
       defaultInput: (inst, part, inputs) => { inputs.sensor_values[inst] = part.range_mm ?? 0; },
-      panelControl: (inst) =>
-        `<input type="number" class="runSensor" value="${runInputs.sensor_values[inst] ?? 0}"> <span class="runReadout"></span>`,
+      // A part with declared `readings` (e.g. env-bme280's own
+      // temp_c/humidity_pct/pressure_hpa) reports several simultaneous
+      // numbers from one physical sensor — one input per named reading —
+      // instead of the single fake-reading box every other sensor here
+      // gets. Generic on `part.readings`, not hardcoded to any one kind, so
+      // imu/light/env all inherit whichever shape fits simply by aliasing
+      // off this entry.
+      panelControl: (inst, part) => {
+        const readings = part.readings || [];
+        if (!readings.length) {
+          return `<input type="number" class="runSensor" value="${runInputs.sensor_values[inst] ?? 0}"> <span class="runReadout"></span>`;
+        }
+        const rows = readings.map(name => {
+          const v = (runInputs.sensor_readings[inst] || {})[name] ?? 0;
+          return `<div class="d" style="margin-top:4px">${name}` +
+            `<input type="number" class="runMultiSensor" data-reading="${name}" value="${v}">` +
+            `</div>`;
+        });
+        return rows.join("") + `<span class="runReadout"></span>`;
+      },
       wireRow: (inst, refs) => {
         const sensor = refs.row.querySelector(".runSensor");
         if (sensor) sensor.addEventListener("change", () => setSensorValue(inst, parseFloat(sensor.value) || 0));
+        for (const el of refs.row.querySelectorAll(".runMultiSensor")) {
+          const name = el.dataset.reading;
+          el.addEventListener("change", () => setSensorReading(inst, name, parseFloat(el.value) || 0));
+        }
       },
       updateReadout: (inst, part, s, refs) => {
         refs.readout.innerHTML =
@@ -288,6 +323,9 @@
         cx.beginPath(); cx.arc(q[0] + 10, q[1] - 10, 3, 0, Math.PI * 2); cx.fill();
       },
     },
+    // input — one or more pins, each a fake bench signal generator standing
+    // in for firmware, the same category as switch/button/potentiometer
+    // even though it's rendered per-pin rather than once per instance.
     mcu: {
       // One slider per pin the sim itself reports as actually driving
       // something (`s.pwm_channels`, from `robowire::signal::mcu_drivable_pins`)
@@ -317,6 +355,7 @@
         }
       },
     },
+    // output — no input of its own, purely what the circuit shows back.
     led: {
       // Brightness tracks live current (20mA ~ a typical indicator LED's
       // rated forward current, used only as a "what counts as fully
@@ -343,9 +382,18 @@
   // imu shares every tof behavior except its default fake reading (0, not
   // range_mm — imu has no "range").
   RUN_COMPONENTS.imu = { ...RUN_COMPONENTS.tof, defaultInput: (inst, part, inputs) => { inputs.sensor_values[inst] = 0; } };
+  // light/env share tof's bus-conflict/current shape too — bus_conflict
+  // just resolves to undefined when not wired to a bus (light never is),
+  // same as any tof/imu instance that isn't. Neither part declares
+  // range_mm, so tof's own defaultInput already yields 0 for both. env's
+  // panelControl automatically renders its three named readings instead of
+  // a single box, purely from its own declared `readings` — nothing here
+  // has to know that env specifically is the multi-reading one.
+  RUN_COMPONENTS.light = { ...RUN_COMPONENTS.tof };
+  RUN_COMPONENTS.env = { ...RUN_COMPONENTS.tof };
 
   function defaultRunInputs() {
-    const inputs = { switches: {}, buttons: {}, pwm_signals: {}, dial_positions: {}, sensor_values: {} };
+    const inputs = { switches: {}, buttons: {}, pwm_signals: {}, dial_positions: {}, sensor_values: {}, sensor_readings: {} };
     for (const [inst, partId] of Object.entries(nl.instances)) {
       const part = partById[partId];
       if (!part) continue;
@@ -368,6 +416,10 @@
   function setButtonHeld(inst, held) { runInputs.buttons[inst] = held; updateRunState(); }
   function setPwmSignal(pin, v) { runInputs.pwm_signals[pin] = v; updateRunState(); }
   function setSensorValue(inst, v) { runInputs.sensor_values[inst] = v; updateRunState(); }
+  function setSensorReading(inst, name, v) {
+    (runInputs.sensor_readings[inst] ||= {})[name] = v;
+    updateRunState();
+  }
 
   // Global release, not just cv's pointerup: a hold started from the side
   // panel (outside the canvas) still needs to let go wherever the pointer

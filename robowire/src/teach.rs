@@ -27,6 +27,19 @@ const EXPLANATIONS: &[ErrorExplanation] = &[
               M1- on the same channel), and check nothing else is also wired to those pins.",
     },
     ErrorExplanation {
+        code: "E05",
+        what: "A motor is either brushed or brushless, and an ESC's driver circuit is built \
+               for one or the other — never both. This checks that a motor's declared winding \
+               type matches the winding type its driving ESC actually supports.",
+        why: "A brushed and a brushless ESC are genuinely different circuits (one just \
+              switches DC, the other commutates three phases) — plugging a brushless motor \
+              into a brushed-only ESC (or the reverse) isn't a \"runs worse\" problem, it \
+              simply won't spin at all, and that's a confusing thing to debug on the bench \
+              when everything else checks out fine.",
+        fix: "Match the ESC to the motor's actual winding type — swap in a brushless ESC for a \
+              brushless motor, or a brushed one for a brushed motor.",
+    },
+    ErrorExplanation {
         code: "E02",
         what: "Every part that takes power declares a safe voltage window (e.g. a 3.3V sensor \
                might accept 2.6-5.5V). This check walks every power pin and confirms the net \

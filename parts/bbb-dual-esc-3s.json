@@ -1,0 +1,26 @@
+{
+  "id": "bbb-dual-esc-3s",
+  "kind": "esc",
+  "mass_g": 6.0,
+  "provisional": true,
+  "current_ma": 18.0,
+  "nominal_v": 11.1,
+  "notes": "dual brushed ESC, same shape as bbb-dual-esc but rated for a 3S pack (and a higher-voltage-wound motor like n20-motor-12v) instead of 2S; 5V BEC still onboard.",
+  "elec": {
+    "pins": {
+      "VIN": { "role": "power_in", "v_range": [9.0, 12.6], "required": true },
+      "GND": { "role": "gnd", "required": true },
+      "BEC5V": { "role": "power_out", "volts": 5.0, "max_a": 1.0 },
+      "S1": { "role": "signal_in", "signal": "pwm", "required": true, "channel": "M1" },
+      "S2": { "role": "signal_in", "signal": "pwm", "required": true, "channel": "M2" },
+      "M1+": { "role": "motor_out", "channel": "M1" },
+      "M1-": { "role": "motor_out", "channel": "M1" },
+      "M2+": { "role": "motor_out", "channel": "M2" },
+      "M2-": { "role": "motor_out", "channel": "M2" }
+    }
+  },
+  "esc": {
+    "supports_winding": "brushed"
+  },
+  "description": "The 3S-rated version of the dual brushed ESC — same role, higher voltage headroom for a build using a 3S pack and higher-voltage-wound drive motors."
+}

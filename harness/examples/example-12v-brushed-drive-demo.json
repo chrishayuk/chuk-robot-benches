@@ -1,0 +1,20 @@
+{
+  "name": "example-12v-brushed-drive-demo",
+  "instances": {
+    "batt": "lipo-3s-450", "sw": "power-switch-slide",
+    "esc": "bbb-dual-esc-3s", "m_l": "n20-motor-12v", "m_r": "n20-motor-12v"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 11.1 },
+    { "id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 11.1 },
+    { "id": "gnd", "pins": ["batt.-", "esc.GND"] },
+    { "id": "ml_a", "pins": ["esc.M1+", "m_l.M+"] },
+    { "id": "ml_b", "pins": ["esc.M1-", "m_l.M-"] },
+    { "id": "mr_a", "pins": ["esc.M2+", "m_r.M+"] },
+    { "id": "mr_b", "pins": ["esc.M2-", "m_r.M-"] },
+    { "id": "s1_unused", "pins": ["esc.S1"], "signal": "pwm" },
+    { "id": "s2_unused", "pins": ["esc.S2"], "signal": "pwm" }
+  ],
+  "buses": [],
+  "failsafe": null
+}

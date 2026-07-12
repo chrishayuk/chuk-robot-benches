@@ -1,0 +1,24 @@
+{
+  "name": "05-shared-5v-rail",
+  "instances": {
+    "batt": "lipo-2s-260", "sw": "power-switch-slide", "esc": "bbb-dual-esc", "m1": "n20-motor-6v",
+    "mcu": "rp2350-zero", "rx": "elrs-rx", "lifter": "servo-9g-lifter"
+  },
+  "nets": [
+    {"id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4},
+    {"id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 7.4},
+    {"id": "v5", "pins": ["esc.BEC5V", "mcu.5V", "rx.VIN", "lifter.+"], "volts": 5.0},
+    {"id": "gnd", "pins": ["batt.-", "esc.GND", "mcu.GND", "rx.GND", "lifter.-"]},
+    {"id": "m1_a", "pins": ["esc.M1+", "m1.M+"]},
+    {"id": "m1_b", "pins": ["esc.M1-", "m1.M-"]},
+    {"id": "pwm_l", "pins": ["mcu.GP2", "esc.S1"], "signal": "pwm"},
+    {"id": "s2_unused", "pins": ["esc.S2"], "signal": "pwm"},
+    {"id": "crsf", "pins": ["rx.TX", "mcu.GP1"], "signal": "uart"},
+    {"id": "lifter_sig", "pins": ["mcu.GP3", "lifter.SIG"], "signal": "pwm"}
+  ],
+  "buses": [],
+  "failsafe": {
+    "rx_loss": "CRSF failsafe frames -> kernel commands neutral -> ESC S1 driven to neutral by MCU; channel 2 (S2) not populated yet; ESC self-cuts on signal loss",
+    "stop_pins": ["esc.S1"]
+  }
+}

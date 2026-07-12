@@ -1,0 +1,25 @@
+{
+  "name": "example-sensors-demo",
+  "instances": {
+    "batt": "lipo-2s-260", "sw": "power-switch-slide", "reg": "reg-5v-mini", "mcu": "rp2350-zero",
+    "light1": "line-sensor-analog", "tof1": "tof-longrange", "env1": "env-bme280"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
+    { "id": "vbat", "pins": ["sw.out", "reg.VIN"], "volts": 7.4 },
+    { "id": "v5", "pins": ["reg.OUT", "mcu.5V", "tof1.VIN"], "volts": 5.0 },
+    { "id": "v33", "pins": ["mcu.3V3", "light1.VIN", "env1.VIN"], "volts": 3.3 },
+    { "id": "gnd", "pins": ["batt.-", "reg.GND", "mcu.GND", "tof1.GND", "light1.GND", "env1.GND"] },
+    { "id": "light_sig", "pins": ["mcu.GP6", "light1.OUT"], "signal": "analog" }
+  ],
+  "buses": [
+    {
+      "id": "i2c0", "kind": "i2c", "sda": "mcu.GP4", "scl": "mcu.GP5",
+      "devices": [
+        { "inst": "tof1", "addr": "0x10" },
+        { "inst": "env1", "addr": "0x76" }
+      ]
+    }
+  ],
+  "failsafe": null
+}

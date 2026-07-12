@@ -44,7 +44,7 @@
   // calls draw() before module 12 has run, so these must be live before
   // that (function declarations hoist fully; `let` does not).
   let runMode = false;
-  let runInputs = { switches: {}, buttons: {}, pwm_signals: {}, sensor_values: {} };
+  let runInputs = { switches: {}, buttons: {}, pwm_signals: {}, sensor_values: {}, sensor_readings: {} };
   let runState = { nets: {}, instances: {} };
   let heldButtonInst = null;
   let spinPhase = 0;
@@ -70,6 +70,13 @@
     battery: "battery", switch: "switch", esc: "motor controller", mcu: "brain (MCU)",
     motor: "motors", tof: "floor sensors", imu: "motion sensor", radio: "radio", wiring: "loom allowance",
     connector: "connector", fuse: "fuse", ptc: "resettable fuse (PTC)", servo: "servo",
+    light: "line/light sensor", env: "environmental sensor", regulator: "regulator",
+    "solar-panel": "solar panel", "charge-controller": "charge controller",
+    // Inputs — a human (or, in run mode, its stand-in slider) drives these.
+    button: "button", potentiometer: "potentiometer",
+    // Outputs/indicators — feedback a human observes, plus the passive part
+    // that almost always accompanies an LED.
+    led: "LEDs", buzzer: "buzzer", resistor: "resistor",
   };
   const kindOn = {};
   for (const k of Object.keys(KIND_LABELS)) kindOn[k] = true;

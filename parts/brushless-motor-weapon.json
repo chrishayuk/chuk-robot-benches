@@ -15,6 +15,7 @@
     "stall_torque_mnm": 60.0,
     "no_load_rpm": 32000.0,
     "stall_current_a": 18.0,
-    "nominal_v": 11.1
+    "nominal_v": 11.1,
+    "winding": "brushless"
   }
 }

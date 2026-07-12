@@ -157,7 +157,8 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
 
         if matches!(
             part.kind.as_str(),
-            "battery" | "regulator" | "esc" | "mcu" | "tof" | "imu" | "radio" | "buzzer" | "servo"
+            "battery" | "regulator" | "esc" | "mcu" | "tof" | "imu" | "light" | "env" | "radio" | "buzzer" | "servo"
+                | "charge-controller"
         ) {
             st.powered = Some(instance_powered(nl, cat, &net_of, &hot, &grounded, inst)?);
         }
@@ -166,7 +167,7 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
         match part.kind.as_str() {
             "switch" => st.closed = Some(inputs.switches.get(inst).copied().unwrap_or(false)),
             "button" => st.closed = Some(inputs.buttons.get(inst).copied().unwrap_or(false)),
-            "regulator" | "esc" | "mcu" | "radio" | "buzzer" | "servo" => {
+            "regulator" | "esc" | "mcu" | "radio" | "buzzer" | "servo" | "charge-controller" => {
                 let (fp_state, sink) =
                     crate::fixed_power::compute(&net_of, &hot, &resolved_volts, elec, part, inst, powered);
                 st = fp_state;
@@ -174,7 +175,7 @@ pub fn run_state(nl: &Netlist, cat: &ElecCatalogue, inputs: &RunInputs) -> Resul
                     sinks.push(s);
                 }
             }
-            "tof" | "imu" => {
+            "tof" | "imu" | "light" | "env" => {
                 let (sensor_state, sink) =
                     crate::sensor::compute(nl, &net_of, &hot, &resolved_volts, inputs, inst, part, elec, powered);
                 st = sensor_state;

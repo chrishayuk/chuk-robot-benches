@@ -1,0 +1,19 @@
+{
+  "name": "lesson-e31-undersized-connector",
+  "instances": {
+    "batt": "lipo-3s-850", "link": "removable-link", "conn": "connector-xt60",
+    "bconn": "connector-bullet-3.5mm", "wesc": "brushless-esc-weapon", "wmotor": "brushless-motor-weapon"
+  },
+  "nets": [
+    { "id": "vbat_link", "pins": ["batt.+", "link.in"], "volts": 11.1 },
+    { "id": "vbat_conn", "pins": ["link.out", "conn.P1"], "volts": 11.1 },
+    { "id": "vbat_main", "pins": ["conn.P2", "bconn.P1"], "volts": 11.1, "gauge_awg": 8, "length_mm": 50.0 },
+    { "id": "vbat_pigtail", "pins": ["bconn.P2", "wesc.VIN"], "volts": 11.1, "gauge_awg": 8, "length_mm": 10.0 },
+    { "id": "gnd", "pins": ["batt.-", "wesc.GND"] },
+    { "id": "wmotor_a", "pins": ["wesc.M1+", "wmotor.M+"] },
+    { "id": "wmotor_b", "pins": ["wesc.M1-", "wmotor.M-"] },
+    { "id": "weapon_sig_unused", "pins": ["wesc.S1"], "signal": "pwm" }
+  ],
+  "buses": [],
+  "failsafe": null
+}

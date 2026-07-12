@@ -1,0 +1,14 @@
+{
+  "id": "solar-panel-9v-2w",
+  "kind": "solar-panel",
+  "mass_g": 25.0,
+  "provisional": true,
+  "notes": "small photovoltaic panel, rated 9V/2W at full nominal sun (energy-sim.md §2.1) — a power SOURCE, not a passthrough like a regulator, but modeled here purely as a power_out pin with no power_in pin at all: it has no upstream electrical input to speak of (its 'input' is light), so it deliberately never becomes a passthrough candidate or a hot-graph seed in robosim's run mode. Whether it's actually producing anything (sun or no sun) is an energy-sim question, not a robowire static-legality one — statically, this is just a source rated for a worst-case output current, checked exactly like any other power_out pin (E02 voltage, E30 budget).",
+  "elec": {
+    "pins": {
+      "OUT": { "role": "power_out", "volts": 9.0, "max_a": 0.22, "required": true },
+      "GND": { "role": "gnd", "required": true }
+    }
+  },
+  "description": "A small solar panel: converts light into DC power at a declared worst-case current, no batteries-included capacity concept the way a chemical cell has — just a rated output, same shape as any other regulated power source in this catalogue."
+}

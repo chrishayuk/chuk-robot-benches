@@ -135,15 +135,30 @@ variant per code (`lesson-<code>-<name>.json`), auto-verified by
 run the checker, then read `explain-error` for the code it names.
 
 `harness/lessons/NN-slug[.json]/NN-slug-broken.json` is a separate, ordered curriculum —
-"start from the real basics and work up," each stage a strict superset of the last
-(`each_stage_strictly_adds_to_the_last`, `robowire/tests/lessons.rs`): `01-basics`
-(battery/switch/resistor/LED) → `02-motor-driver` (+ESC+motor) → `03-brain-and-radio`
-(+MCU+receiver, BEC/PWM/UART/failsafe) → `04-shared-5v-rail` (+servo — its broken variant
-deliberately fails two codes, E02 overvoltage and E32 brownout, from one mistake: wiring
-the brain straight to the battery instead of through the BEC) → `05-sensor-bus` (+2×ToF,
-the dual-0x29 classic, E20). Only one motor channel is used throughout — `rp2350-zero`
-has just two PWM-capable pins, and the servo needs one, so there's no channel left for a
-second drive motor without widening the catalogue.
+"start from the real basics and work up." Stages 1-2 are standalone foundational
+vignettes (neither needs a motor at all); the real accumulating build
+(`motor_stages_strictly_accumulate`, `robowire/tests/lessons.rs`) runs from stage 3
+onward, each a strict superset of the last: `01-basics` (battery/switch/resistor/LED,
+E33) → `02-regulator` (+standalone 5V regulator, no ESC/BEC involved — a 3S battery on a
+part only rated to 9V, E02, the classic wrong-cell-count mismatch) → `03-motor-driver`
+(+ESC+motor, E40) → `04-brain-and-radio` (+MCU+receiver, BEC/PWM/UART/failsafe, E41) →
+`05-shared-5v-rail` (+servo — its broken variant deliberately fails two codes, E02
+overvoltage and E32 brownout, from one mistake: wiring the brain straight to the battery
+instead of through the BEC) → `06-sensor-bus` (+2×ToF, the dual-0x29 classic, E20) →
+`07-two-wheel-drive` (+second drive motor on `esc.M2`/`mcu.GP7` — a capstone matching
+`mvp-wedge-harness.json`'s real 2WD topology; its broken variant plants the classic "both
+motors wired to the same channel" mistake, E01). `rp2350-zero`'s `GP6`/`GP7` gained
+`analog`/`pwm` capabilities respectively to make room for this and the sensor catalogue
+below, widening the catalogue rather than working around it.
+
+The sensor catalogue also grew a `light` kind (`line-sensor-analog` — an analog
+reflectance/photoresistor line-and-edge sensor, not on any bus, sharing `tof`/`imu`'s
+exact fake-reading/current-draw component shape) and an `env` kind (`env-bme280` — an
+I2C temp/humidity/pressure breakout; this model's single scalar `value` field can only
+carry ONE representative reading, documented on the part rather than silently implied),
+plus a longer-range `tof` part (`tof-longrange`, needs 5V rather than 3.3V, a real
+power-budget tradeoff). `env` is general robotics-teaching breadth, not something an
+antweight combat robot would ever wire in — documented as such on the part itself.
 
 The designer has a **teaching mode** (mirrors run mode's toggle) that puts this loop
 directly in the UI: the sidebar renders the numbered curriculum in order (not the flat

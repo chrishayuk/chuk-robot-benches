@@ -1,0 +1,17 @@
+{
+  "id": "charge-controller-small",
+  "kind": "charge-controller",
+  "mass_g": 3.0,
+  "provisional": true,
+  "current_ma": 2.0,
+  "nominal_v": 9.0,
+  "notes": "small solar charge controller: regulates a panel's variable output down to a safe charging voltage for a 2S LiPo pack. Electrically the exact same passthrough shape as `regulator` (power_in with a v_range, power_out with a declared voltage/max_a) — E01-E41 already check it generically by role, nothing new needed. Its own `current_ma`/`nominal_v` describe quiescent draw on its INPUT (panel) side, same convention as reg-5v-mini.",
+  "elec": {
+    "pins": {
+      "VIN": { "role": "power_in", "v_range": [6.0, 12.0], "required": true },
+      "GND": { "role": "gnd", "required": true },
+      "OUT": { "role": "power_out", "volts": 7.4, "max_a": 0.5 }
+    }
+  },
+  "description": "A solar charge controller: takes a panel's raw, sun-dependent output and turns it into a safe, regulated charge current for the battery it's wired to — the part that keeps a solar-powered build from overcharging or backfeeding its pack."
+}

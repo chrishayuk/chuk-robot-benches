@@ -223,7 +223,7 @@ pub(crate) fn worst_case_sinks(
         let Some(elec) = &part.elec else { continue };
 
         match part.kind.as_str() {
-            "regulator" | "esc" | "mcu" | "radio" | "buzzer" | "tof" | "imu" | "servo" => {
+            "regulator" | "esc" | "mcu" | "radio" | "buzzer" | "tof" | "imu" | "light" | "env" | "servo" | "charge-controller" => {
                 if let Some(ma) = part.current_ma {
                     if let Some(net) = pin_net_by_role(elec, inst, net_of, "power_in") {
                         sinks.push((net, ma / 1000.0));

@@ -92,11 +92,12 @@
   }
 
   const ARRANGE_ROWS = [
-    ["battery", "connector", "fuse", "ptc", "switch", "regulator"],
+    ["battery", "connector", "fuse", "ptc", "switch", "regulator", "solar-panel", "charge-controller"],
     ["esc", "motor", "servo"],
     ["mcu"],
-    ["tof", "imu", "radio"],
-    ["led", "resistor", "potentiometer", "buzzer", "button"],
+    ["tof", "imu", "light", "env", "radio"],
+    ["button", "potentiometer"],
+    ["led", "buzzer", "resistor"],
   ];
   function autoArrange() {
     const insts = Object.keys(nl.instances);
@@ -176,12 +177,18 @@
     draw();
   }
   const PART_GROUPS = [
-    ["power", ["battery", "switch", "connector", "fuse", "ptc"]],
+    ["power", ["battery", "switch", "connector", "fuse", "ptc", "regulator", "solar-panel", "charge-controller"]],
     ["drive", ["esc", "motor", "servo"]],
     ["brain", ["mcu"]],
-    ["sensors", ["tof", "imu"]],
+    ["sensors", ["tof", "imu", "light", "env"]],
     ["radio", ["radio"]],
-    ["indicators & passives", ["led", "buzzer", "resistor", "potentiometer", "button"]],
+    // Split out from the old catch-all "indicators & passives": a button or
+    // potentiometer is something a human drives INTO the circuit; an LED or
+    // buzzer is feedback the circuit drives OUT to a human. A resistor is
+    // neither — a passive component, almost always paired with an LED.
+    ["inputs", ["button", "potentiometer"]],
+    ["outputs", ["led", "buzzer"]],
+    ["passives", ["resistor"]],
   ];
   function renderPalette() {
     const el = document.getElementById("palette");

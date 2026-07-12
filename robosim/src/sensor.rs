@@ -1,5 +1,8 @@
-//! Bus sensor (tof/imu) component behavior — the fake reading, bus-address
-//! conflict detection, and current draw, factored out of `simulate.rs`'s
+//! Fake-reading sensor component behavior (tof/imu/light/env) — a settable
+//! reading (or, for a part that declares `readings`, several simultaneous
+//! named ones — one physical sensor, more than one number), optional I2C
+//! bus-address conflict detection (harmlessly absent for a non-bus sensor
+//! like `light`), and current draw, factored out of `simulate.rs`'s
 //! dispatch match for the same reason `led.rs`/`motor.rs` were.
 
 use crate::electrical::fixed_power_draw;
@@ -21,9 +24,6 @@ pub fn compute(
     elec: &Elec,
     powered: bool,
 ) -> (InstanceRunState, Option<(String, f64)>) {
-    let default_val = part.range_mm.unwrap_or(0.0);
-    let value = inputs.sensor_values.get(inst).copied().unwrap_or(default_val);
-
     let mut bus_conflict = None;
     for bus in &nl.buses {
         if !bus.devices.iter().any(|d| &d.inst == inst) {
@@ -39,9 +39,23 @@ pub fn compute(
 
     let mut state = InstanceRunState::default();
     state.powered = Some(powered);
-    state.value = Some(value);
     state.bus_conflict = bus_conflict;
     state.current_a = Some(amps);
+
+    match &part.readings {
+        Some(names) if !names.is_empty() => {
+            let set = inputs.sensor_readings.get(inst);
+            let readings = names
+                .iter()
+                .map(|name| (name.clone(), set.and_then(|m| m.get(name)).copied().unwrap_or(0.0)))
+                .collect();
+            state.readings = Some(readings);
+        }
+        _ => {
+            let default_val = part.range_mm.unwrap_or(0.0);
+            state.value = Some(inputs.sensor_values.get(inst).copied().unwrap_or(default_val));
+        }
+    }
 
     (state, sink)
 }

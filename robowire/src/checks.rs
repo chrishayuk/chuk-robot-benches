@@ -126,6 +126,37 @@ pub fn e01_motor_channels(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResu
     Ok(ok(C, D, "all motors paired to single driver channels".into()))
 }
 
+/// E05: a motor's winding type (brushed/brushless — `MotorProps::winding`)
+/// matches its driving ESC's own declared support (`EscProps::supports_winding`).
+/// The two are genuinely different circuits, not a "runs worse" mismatch —
+/// wiring a brushless motor to a brushed-only ESC just doesn't spin. Skips
+/// (doesn't fabricate an opinion) wherever either side leaves its own field
+/// unset, or where E01 already can't resolve a single driver channel.
+pub fn e05_motor_esc_winding_match(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult, String> {
+    const C: &str = "E05";
+    const D: &str = "motor winding type matches its driving ESC's declared support";
+    for (inst, part_id) in &nl.instances {
+        let (part, _) = cat.get(part_id)?;
+        let Some(motor_winding) = part.motor.as_ref().and_then(|m| m.winding.as_ref()) else { continue };
+        let Some(elec) = &part.elec else { continue };
+        let Some(pin) = elec.pins.iter().find(|(_, d)| d.role == "motor_in").map(|(n, _)| n) else { continue };
+        let endpoint = format!("{inst}.{pin}");
+        let Some(driver_pin) = motor_output_pin(nl, cat, &endpoint)? else { continue };
+        let (esc_inst, _) = split_pin(&driver_pin)?;
+        let esc_part_id = nl.instances.get(esc_inst).ok_or_else(|| format!("unknown instance '{esc_inst}'"))?;
+        let (esc_part, _) = cat.get(esc_part_id)?;
+        let Some(supports) = esc_part.esc.as_ref().map(|e| &e.supports_winding) else { continue };
+        if supports != motor_winding {
+            return Ok(fail(
+                C,
+                D,
+                format!("{inst} is {motor_winding} but its driver {esc_inst} only supports {supports}"),
+            ));
+        }
+    }
+    Ok(ok(C, D, "every motor's winding type matches its driver".into()))
+}
+
 /// E02: power pins reach a rail of legal voltage.
 pub fn e02_rail_voltages(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult, String> {
     const C: &str = "E02";
@@ -519,6 +550,7 @@ pub fn e41_failsafe_chain(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResu
 pub fn run_checks(nl: &Netlist, cat: &ElecCatalogue) -> Result<Vec<CheckResult>, String> {
     let mut results = vec![
         e01_motor_channels(nl, cat)?,
+        e05_motor_esc_winding_match(nl, cat)?,
         e02_rail_voltages(nl, cat)?,
         e03_polarity(nl, cat)?,
         e04_required_pins(nl, cat)?,

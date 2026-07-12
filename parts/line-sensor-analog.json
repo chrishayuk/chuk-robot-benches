@@ -1,0 +1,17 @@
+{
+  "id": "line-sensor-analog",
+  "kind": "light",
+  "mass_g": 1.0,
+  "provisional": true,
+  "current_ma": 10.0,
+  "nominal_v": 3.3,
+  "notes": "reflectance/photoresistor-style analog line-and-edge sensor — a cheaper, simpler alternative or complement to a ToF module: a single analog voltage, not an I2C reading. `value` here represents that voltage as a 0 (dark/no reflection) to 100 (bright/reflecting) reading, not a physical distance.",
+  "elec": {
+    "pins": {
+      "VIN": { "role": "power_in", "v_range": [3.0, 5.5], "required": true },
+      "GND": { "role": "gnd", "required": true },
+      "OUT": { "role": "signal_out", "signal": "analog", "required": true }
+    }
+  },
+  "description": "A simple line/edge sensor: reads reflected light off the floor as a single analog voltage. Cheaper and simpler than a ToF module, and a common alternative for line-following or a second, independent way to sense the table edge."
+}

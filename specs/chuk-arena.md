@@ -384,3 +384,15 @@ Full robot state is readable at all times, digital or physical, under one schema
 - Q5. Public artifact: does arena-view + corpus subset ship as the YouTube-facing "watch
   the strategies evolve" asset, and if so what stays private (per the moat posture:
   methodology public, tuned parameters and full corpus private)?
+- Q6. Non-combat harsh-environment survival (the "Twister/Dorothy" case: a sensor pod
+  deployed into a storm, surviving wind-gust and debris impacts rather than another
+  robot's weapon). No new physics needed — §3a's factoring already separates Robot ×
+  Environment × Protocol, so this is "just" a new `EnvSpec` (wind/debris force fields
+  over time instead of μ(x,y)) reusing `arena-events`' existing impact/flip/tilt analytic
+  layer (§4.3, §4.6) unchanged. Combat wedge and storm pod turn out to share the same
+  physical-survival questions (impact resistance, tip resistance, low-CoG stability); only
+  the *source* of the impacting force differs. Whether the pod *keeps running* through
+  the storm (power budget over the encounter) is a separate, orthogonal question — see
+  `energy-sim.md`, which owns duty-cycle/state-of-charge and explicitly does not overlap
+  arena-plant's combat-timescale physics. Not scoped for v0.1; noted here as a concrete,
+  low-new-machinery direction for whenever a non-combat `EnvSpec` becomes a real priority.

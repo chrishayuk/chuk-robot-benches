@@ -23,8 +23,11 @@
     const btn = document.getElementById("teachBtn");
     btn.textContent = "exit teaching mode";
     btn.classList.add("primary");
-    document.getElementById("palette").style.display = "none";
-    document.getElementById("partFilter").style.display = "none";
+    // The palette stays visible (unlike the old design): a lesson is a
+    // starting point to experiment from, not a locked demo — dragging in a
+    // different battery, a different sensor kind, or an extra part and
+    // seeing what the live checks/run mode do with it IS the point, not a
+    // distraction from it.
     refresh();
   }
 
@@ -34,8 +37,6 @@
     const btn = document.getElementById("teachBtn");
     btn.textContent = "teaching mode";
     btn.classList.remove("primary");
-    document.getElementById("palette").style.display = "";
-    document.getElementById("partFilter").style.display = "";
     refresh();
   }
 

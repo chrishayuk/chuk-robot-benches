@@ -1,0 +1,24 @@
+{
+  "id": "env-bme280",
+  "kind": "env",
+  "mass_g": 0.5,
+  "provisional": true,
+  "current_ma": 1.0,
+  "nominal_v": 3.3,
+  "notes": "temperature/humidity/pressure I2C breakout — general robotics I/O teaching, not something an antweight combat robot needs. Reports three independent live readings from one physical part (see `readings`), not a single collapsed number.",
+  "readings": ["temp_c", "humidity_pct", "pressure_hpa"],
+  "elec": {
+    "pins": {
+      "VIN": { "role": "power_in", "v_range": [1.8, 3.6], "required": true },
+      "GND": { "role": "gnd", "required": true },
+      "SDA": { "role": "bus_sda", "required": true },
+      "SCL": { "role": "bus_scl", "required": true }
+    },
+    "bus": {
+      "kind": "i2c",
+      "default_addr": "0x76",
+      "io_v": 3.3
+    }
+  },
+  "description": "An environmental sensor: ambient temperature, humidity, and pressure, all from one physical part. Not a combat-robot part — included for general robotics I/O practice, the same I2C-bus shape as a ToF or IMU."
+}

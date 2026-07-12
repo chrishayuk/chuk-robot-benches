@@ -1,0 +1,21 @@
+{
+  "name": "example-brushless-drive-demo",
+  "instances": {
+    "batt": "lipo-3s-450", "sw": "power-switch-slide",
+    "esc_l": "brushless-esc-drive", "esc_r": "brushless-esc-drive",
+    "m_l": "brushless-motor-drive", "m_r": "brushless-motor-drive"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 11.1 },
+    { "id": "vbat", "pins": ["sw.out", "esc_l.VIN", "esc_r.VIN"], "volts": 11.1 },
+    { "id": "gnd", "pins": ["batt.-", "esc_l.GND", "esc_r.GND"] },
+    { "id": "ml_a", "pins": ["esc_l.M1+", "m_l.M+"] },
+    { "id": "ml_b", "pins": ["esc_l.M1-", "m_l.M-"] },
+    { "id": "mr_a", "pins": ["esc_r.M1+", "m_r.M+"] },
+    { "id": "mr_b", "pins": ["esc_r.M1-", "m_r.M-"] },
+    { "id": "sig_l_unused", "pins": ["esc_l.S1"], "signal": "pwm" },
+    { "id": "sig_r_unused", "pins": ["esc_r.S1"], "signal": "pwm" }
+  ],
+  "buses": [],
+  "failsafe": null
+}

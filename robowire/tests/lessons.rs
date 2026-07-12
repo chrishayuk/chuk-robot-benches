@@ -26,7 +26,7 @@ fn load(name: &str) -> (Netlist, ElecCatalogue) {
 
 /// Hard failures AND warns, both as plain codes — a warn (`pass: true, tier:
 /// Warn`) never blocks the verdict, but it's still a real signal a lesson
-/// can deliberately demonstrate (stage 4's broken variant does exactly
+/// can deliberately demonstrate (stage 5's broken variant does exactly
 /// that: E02 fails outright, E32 warns, from the same one mistake).
 fn non_clean_codes(nl: &Netlist, cat: &ElecCatalogue) -> Vec<String> {
     run_checks(nl, cat)
@@ -63,53 +63,86 @@ fn stage_01_basics_legal_and_broken() {
 }
 
 #[test]
-fn stage_02_motor_driver_legal_and_broken() {
-    assert_legal("02-motor-driver");
-    assert_fails_exactly("02-motor-driver-broken", &["E40"]);
+fn stage_02_regulator_legal_and_broken() {
+    assert_legal("02-regulator");
+    // A 3S battery on a regulator only rated for up to 9V — the classic
+    // "wrong cell count for this part" mismatch, caught on the regulator's
+    // own input pin regardless of what it's feeding downstream.
+    assert_fails_exactly("02-regulator-broken", &["E02"]);
 }
 
 #[test]
-fn stage_03_brain_and_radio_legal_and_broken() {
-    assert_legal("03-brain-and-radio");
-    assert_fails_exactly("03-brain-and-radio-broken", &["E41"]);
+fn stage_03_motor_driver_legal_and_broken() {
+    assert_legal("03-motor-driver");
+    assert_fails_exactly("03-motor-driver-broken", &["E40"]);
 }
 
 #[test]
-fn stage_04_shared_5v_rail_legal_and_broken() {
-    assert_legal("04-shared-5v-rail");
+fn stage_04_brain_and_radio_legal_and_broken() {
+    assert_legal("04-brain-and-radio");
+    assert_fails_exactly("04-brain-and-radio-broken", &["E41"]);
+}
+
+#[test]
+fn stage_05_shared_5v_rail_legal_and_broken() {
+    assert_legal("05-shared-5v-rail");
     // One mistake (skipping the BEC hop), two independent consequences: the
     // MCU is both over its rated voltage (E02) AND now shares an unbuffered
     // rail with the motor-driving ESC (E32, warn-tier) — a deliberately
     // instructive double failure, not a test bug.
-    assert_fails_exactly("04-shared-5v-rail-broken", &["E02", "E32"]);
+    assert_fails_exactly("05-shared-5v-rail-broken", &["E02", "E32"]);
 }
 
 #[test]
-fn stage_05_sensor_bus_legal_and_broken() {
-    assert_legal("05-sensor-bus");
-    assert_fails_exactly("05-sensor-bus-broken", &["E20"]);
+fn stage_06_sensor_bus_legal_and_broken() {
+    assert_legal("06-sensor-bus");
+    assert_fails_exactly("06-sensor-bus-broken", &["E20"]);
 }
 
 #[test]
-fn each_stage_strictly_adds_to_the_last() {
-    // "Start from the real basics and work up": every stage's instance set
-    // is a superset of the previous stage's, proving this is one
-    // accumulating build, not disconnected snapshots.
-    let stages = ["01-basics", "02-motor-driver", "03-brain-and-radio", "04-shared-5v-rail", "05-sensor-bus"];
+fn stage_07_two_wheel_drive_legal_and_broken() {
+    assert_legal("07-two-wheel-drive");
+    // Adding the second drive motor's channel is exactly where the classic
+    // "both motors wired to the same channel" mistake shows up.
+    assert_fails_exactly("07-two-wheel-drive-broken", &["E01"]);
+}
+
+#[test]
+fn batt_and_sw_persist_across_every_stage() {
+    // battery/switch are the one constant every stage keeps, even across the
+    // foundational vignettes (1: bare basics, 2: regulator) that don't
+    // literally accumulate onto each other instance-for-instance yet.
+    let stages = [
+        "01-basics", "02-regulator", "03-motor-driver", "04-brain-and-radio", "05-shared-5v-rail",
+        "06-sensor-bus", "07-two-wheel-drive",
+    ];
+    for name in stages {
+        let (nl, _) = load(name);
+        assert!(nl.instances.contains_key("batt"), "{name}: missing 'batt'");
+        assert!(nl.instances.contains_key("sw"), "{name}: missing 'sw'");
+    }
+}
+
+#[test]
+fn motor_stages_strictly_accumulate() {
+    // The real "one accumulating build" chain starts once the motor+ESC
+    // vignette (stage 3) is established: stages 1-2 are standalone
+    // foundational vignettes (bare basics, then a regulator — neither needs
+    // a motor at all), but from stage 3 onward, every stage is a strict
+    // superset of the last (esc/m1 persist from 3, mcu/rx from 4, lifter
+    // from 5, tof1/tof2 from 6) — proving this half of the curriculum is
+    // one accumulating build, not disconnected snapshots.
+    let stages = ["03-motor-driver", "04-brain-and-radio", "05-shared-5v-rail", "06-sensor-bus", "07-two-wheel-drive"];
     let mut prev: Option<Netlist> = None;
     for name in stages {
         let (nl, _) = load(name);
         if let Some(p) = &prev {
-            // battery/switch/ground are the one constant every stage keeps;
-            // everything else should only grow, kind by kind.
             for inst in p.instances.keys() {
-                if inst == "batt" || inst == "sw" {
-                    assert!(nl.instances.contains_key(inst), "{name}: lost '{inst}' from an earlier stage");
-                }
+                assert!(nl.instances.contains_key(inst), "{name}: lost '{inst}' from an earlier stage");
             }
             assert!(
-                nl.instances.len() >= p.instances.len(),
-                "{name}: has fewer instances ({}) than the previous stage ({})",
+                nl.instances.len() > p.instances.len(),
+                "{name}: has no more instances ({}) than the previous stage ({})",
                 nl.instances.len(),
                 p.instances.len()
             );

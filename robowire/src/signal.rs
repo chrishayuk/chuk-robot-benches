@@ -1,11 +1,13 @@
 //! Run-time signal-path resolution: which `mcu_io` pin ultimately drives a
 //! given `signal_in`-role pin (an ESC channel, a servo's `SIG`, ...), and the
-//! reverse — which motor a given signal pin ends up driving. Shared by
-//! robosim's run-mode data source, so a run-mode slider's value has to flow
-//! through the netlist's real wiring to reach a motor, rather than being
-//! pinned directly to the motor instance itself (the same "no consumer
-//! reconstructs what the sim can compute" principle already applied to
-//! `motor_output_pin`, `led_current_limited`, etc.).
+//! reverse — which instance a given signal pin ends up driving (a motor, via
+//! its ESC's channel; or, for a single dedicated signal pin like a servo's
+//! `SIG` with no channel to disambiguate, that pin's own instance directly).
+//! Shared by robosim's run-mode data source, so a run-mode slider's value
+//! has to flow through the netlist's real wiring to reach whatever it
+//! drives, rather than being pinned directly to a motor instance itself (the
+//! same "no consumer reconstructs what the sim can compute" principle
+//! already applied to `motor_output_pin`, `led_current_limited`, etc.).
 
 use crate::catalogue::ElecCatalogue;
 use crate::checks::{motor_output_pin, pin_decl};
@@ -56,7 +58,7 @@ pub fn signal_source_pin(
 /// pin's `mcu_io` source — the two hops from `m1.M+` to `mcu.GP2`. `None` at
 /// any hop (no driver, no declared channel, no matching signal pin, no MCU
 /// wired) means "nothing supplies this motor a signal" — a real, legal
-/// circuit state (see `harness/lessons/02-motor-driver.json`, which has no
+/// circuit state (see `harness/lessons/03-motor-driver.json`, which has no
 /// brain yet), not an error.
 pub fn motor_signal_source_pin(
     nl: &Netlist,
@@ -91,7 +93,7 @@ pub fn mcu_drivable_pins(
         let endpoint = format!("{mcu_inst}.{pin}");
         let sig_pins = co_net_pins_with_role(nl, cat, &endpoint, "signal_in")?;
         let [sig_pin] = sig_pins.as_slice() else { continue };
-        out.push((pin.clone(), driven_motor_inst(nl, cat, sig_pin)?));
+        out.push((pin.clone(), driven_inst(nl, cat, sig_pin)?));
     }
     out.sort();
     Ok(out)
@@ -121,17 +123,23 @@ fn single_pin_by_role_and_channel(
     Ok(Some(matches[0].clone()))
 }
 
-/// The motor instance whose terminals resolve, via channel matching, back to
-/// this `signal_in` pin's own driver instance and channel — the reverse hop
-/// of `motor_signal_source_pin`, used only to label a run-mode slider
-/// ("GP2 -> m1"), never for any electrical computation.
-fn driven_motor_inst(
+/// The instance a `signal_in` pin ultimately drives — the reverse hop of
+/// `motor_signal_source_pin`, used only to label a run-mode slider
+/// ("GP2 -> m1"), never for any electrical computation. Two shapes:
+/// - No `channel` declared (a servo's `SIG`, or any other single dedicated
+///   signal pin): this pin's OWN instance is what it drives directly, no
+///   further tracing needed.
+/// - A `channel` declared (an ESC's `S1`/`S2`, ...): find the matching
+///   `motor_out` pin(s) on the SAME instance and trace to the motor.
+fn driven_inst(
     nl: &Netlist,
     cat: &ElecCatalogue,
     signal_in_pin: &str,
 ) -> Result<Option<String>, String> {
-    let Some(channel) = pin_decl(nl, cat, signal_in_pin)?.channel.clone() else { return Ok(None) };
     let (driver_inst, _) = crate::schema::split_pin(signal_in_pin)?;
+    let Some(channel) = pin_decl(nl, cat, signal_in_pin)?.channel.clone() else {
+        return Ok(Some(driver_inst.to_string()));
+    };
     let part_id = nl.instances.get(driver_inst).ok_or_else(|| format!("no such instance '{driver_inst}'"))?;
     let (part, _) = cat.get(part_id)?;
     let Some(elec) = &part.elec else { return Ok(None) };

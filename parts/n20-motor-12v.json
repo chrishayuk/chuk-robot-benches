@@ -1,0 +1,21 @@
+{
+  "id": "n20-motor-12v",
+  "kind": "motor",
+  "mass_g": 9.0,
+  "provisional": true,
+  "notes": "same N20 gearmotor form factor and gearbox as n20-motor-6v, wound for 12V instead — same rated power at roughly half the current, for a build running a higher-voltage pack.",
+  "elec": {
+    "pins": {
+      "M+": { "role": "motor_in", "required": true },
+      "M-": { "role": "motor_in", "required": true }
+    }
+  },
+  "description": "A geared drive motor, same size and gearing as the 6V N20 but wound for a 12V supply — the choice when the rest of the build already runs a higher-voltage pack and a second regulated rail isn't wanted just for the drive motors.",
+  "motor": {
+    "stall_torque_mnm": 20.0,
+    "no_load_rpm": 1000.0,
+    "stall_current_a": 1.0,
+    "nominal_v": 12.0,
+    "winding": "brushed"
+  }
+}

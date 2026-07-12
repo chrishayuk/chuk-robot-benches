@@ -1,0 +1,43 @@
+{
+  "id": "tof-longrange",
+  "kind": "tof",
+  "mass_g": 5.0,
+  "fov_deg": 2.0,
+  "range_mm": 4000.0,
+  "provisional": true,
+  "current_ma": 80.0,
+  "nominal_v": 5.0,
+  "notes": "longer-range single-point laser rangefinder (TF-Luna-style) — same 2-wire I2C interface and XSHUT reassignment as vl53l0x-breakout, but a narrower beam, longer range, and needs 5V rather than 3.3V, at a real current-budget cost.",
+  "elec": {
+    "pins": {
+      "VIN": {
+        "role": "power_in",
+        "v_range": [4.5, 5.5],
+        "required": true
+      },
+      "GND": {
+        "role": "gnd",
+        "required": true
+      },
+      "SDA": {
+        "role": "bus_sda",
+        "required": true
+      },
+      "SCL": {
+        "role": "bus_scl",
+        "required": true
+      },
+      "XSHUT": {
+        "role": "gpio_in"
+      }
+    },
+    "bus": {
+      "kind": "i2c",
+      "default_addr": "0x10",
+      "addr_reassignable": true,
+      "requires_xshut": true,
+      "io_v": 3.3
+    }
+  },
+  "description": "A longer-range laser distance sensor: the same edge-detection role as a ToF breakout, but able to see much further down (or out) — the choice when a robot needs range a short-range ToF module can't reach, at the cost of a heavier 5V current draw."
+}

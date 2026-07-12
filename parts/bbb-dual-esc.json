@@ -55,5 +55,8 @@
       }
     }
   },
-  "description": "The motor controller (ESC). It turns the brain's throttle commands into switched battery power for the two drive motors, and its built-in 5V regulator (the BEC) powers the brain and radio."
+  "description": "The motor controller (ESC). It turns the brain's throttle commands into switched battery power for the two drive motors, and its built-in 5V regulator (the BEC) powers the brain and radio.",
+  "esc": {
+    "supports_winding": "brushed"
+  }
 }

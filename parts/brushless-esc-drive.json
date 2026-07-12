@@ -1,0 +1,22 @@
+{
+  "id": "brushless-esc-drive",
+  "kind": "esc",
+  "mass_g": 5.0,
+  "provisional": true,
+  "current_ma": 15.0,
+  "nominal_v": 11.1,
+  "notes": "single-channel brushless ESC for one drive motor — a 2WD build needs two instances, one per wheel, the same way two single-channel weapon ESCs would be used rather than a dual-channel one. No BEC of its own, same as the weapon ESC.",
+  "elec": {
+    "pins": {
+      "VIN": { "role": "power_in", "v_range": [6.0, 12.6], "required": true },
+      "GND": { "role": "gnd", "required": true },
+      "S1": { "role": "signal_in", "signal": "pwm", "required": true, "channel": "M1" },
+      "M1+": { "role": "motor_out", "channel": "M1" },
+      "M1-": { "role": "motor_out", "channel": "M1" }
+    }
+  },
+  "esc": {
+    "supports_winding": "brushless"
+  },
+  "description": "A single-channel brushless drive ESC — the brushless counterpart to the brushed dual-ESC, one per motor rather than one for both."
+}

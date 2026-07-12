@@ -1,0 +1,17 @@
+{
+  "name": "lesson-e05-brushed-motor-brushless-esc",
+  "instances": {
+    "batt": "lipo-3s-450", "sw": "power-switch-slide",
+    "esc": "brushless-esc-drive", "m1": "n20-motor-6v"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 11.1 },
+    { "id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 11.1 },
+    { "id": "gnd", "pins": ["batt.-", "esc.GND"] },
+    { "id": "m1_a", "pins": ["esc.M1+", "m1.M+"] },
+    { "id": "m1_b", "pins": ["esc.M1-", "m1.M-"] },
+    { "id": "sig_unused", "pins": ["esc.S1"], "signal": "pwm" }
+  ],
+  "buses": [],
+  "failsafe": null
+}

@@ -1,0 +1,16 @@
+{
+  "name": "02-regulator",
+  "instances": {
+    "batt": "lipo-2s-260", "sw": "power-switch-slide", "reg": "reg-5v-mini",
+    "r1": "resistor-330r", "led1": "led-red-5mm"
+  },
+  "nets": [
+    { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
+    { "id": "vbat", "pins": ["sw.out", "reg.VIN"], "volts": 7.4 },
+    { "id": "v5", "pins": ["reg.OUT", "r1.P1"], "volts": 5.0 },
+    { "id": "led_feed", "pins": ["r1.P2", "led1.A"] },
+    { "id": "gnd", "pins": ["batt.-", "reg.GND", "led1.K"] }
+  ],
+  "buses": [],
+  "failsafe": null
+}
