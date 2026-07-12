@@ -199,6 +199,40 @@ const EXPLANATIONS: &[ErrorExplanation] = &[
         fix: "Add insulation (heat-shrink, sleeving) and declare it, or reroute the wire away \
               from exposed contact.",
     },
+    ErrorExplanation {
+        code: "E43",
+        what: "A charge controller declares which battery chemistry and cell count it's \
+               actually built to charge (its `charge_profile`). This checks that the battery \
+               wired to its output matches — same chemistry, same series cell count.",
+        why: "A charger tuned for the wrong chemistry or cell count either never fully charges \
+              the pack, or worse, keeps pushing current past the pack's real termination \
+              voltage — the classic way an unattended overnight charge turns into a swollen or \
+              vented cell.",
+        fix: "Use a charge controller whose declared charge_profile (chemistry, cell_count) \
+              matches the battery it's wired to, or swap in a battery that matches the charger \
+              you already have.",
+    },
+    ErrorExplanation {
+        code: "E44",
+        what: "Warns when a multi-cell battery pack (2S, 3S, ...) has no declared `has_bms` — \
+               no onboard protection or cell-balancing circuit.",
+        why: "Series-wired lithium cells drift apart in charge over time; without balancing, \
+              one cell can be pushed into overcharge while another is left under-charged, \
+              invisible from the pack's bare +/- terminals alone.",
+        fix: "Confirm this pack is charged through a balance-lead-aware charger, or fit an \
+              inline protection (BMS) board — then declare the part's has_bms true once it's \
+              genuinely covered.",
+    },
+    ErrorExplanation {
+        code: "E45",
+        what: "Warns when no fuse or resettable PTC fuse is reachable anywhere on the \
+               battery's positive path.",
+        why: "A crushed cable, a solder bridge, or a failed downstream part can pull far more \
+              current than any wire is rated for — a fuse or PTC is the one part whose entire \
+              job is surviving that moment so nothing else has to.",
+        fix: "Add a fuse or PTC (e.g. fuse-ptc-5a) in series with the battery's positive \
+              terminal, sized to the rail's normal worst-case current.",
+    },
 ];
 
 pub fn explain_error(code: &str) -> Option<&'static ErrorExplanation> {

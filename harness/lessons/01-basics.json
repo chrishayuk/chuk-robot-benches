@@ -1,9 +1,10 @@
 {
   "name": "01-basics",
-  "instances": { "batt": "lipo-2s-260", "sw": "power-switch-slide", "pot": "potentiometer-1k", "led1": "led-red-5mm" },
+  "instances": { "batt": "lipo-2s-260-bms", "sw": "power-switch-slide", "fuse": "fuse-ptc-5a", "pot": "potentiometer-1k", "led1": "led-red-5mm" },
   "nets": [
     { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
-    { "id": "feed", "pins": ["sw.out", "pot.P1"], "volts": 7.4 },
+    { "id": "vbat_fuse", "pins": ["sw.out", "fuse.P1"], "volts": 7.4 },
+    { "id": "feed", "pins": ["fuse.P2", "pot.P1"], "volts": 7.4 },
     { "id": "led_feed", "pins": ["pot.P2", "led1.A"] },
     { "id": "gnd", "pins": ["led1.K", "batt.-"] }
   ],

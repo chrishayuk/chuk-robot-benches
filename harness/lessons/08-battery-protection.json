@@ -1,8 +1,11 @@
 {
-  "name": "03-motor-driver-broken",
-  "instances": { "batt": "lipo-2s-260-bms", "fuse": "fuse-ptc-5a", "esc": "bbb-dual-esc", "m1": "n20-motor-6v" },
+  "name": "08-battery-protection",
+  "instances": {
+    "batt": "lipo-2s-260-bms", "sw": "power-switch-slide", "fuse": "fuse-ptc-5a", "esc": "bbb-dual-esc", "m1": "n20-motor-6v"
+  },
   "nets": [
-    {"id": "vbat_fuse", "pins": ["batt.+", "fuse.P1"], "volts": 7.4},
+    {"id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4},
+    {"id": "vbat_fuse", "pins": ["sw.out", "fuse.P1"], "volts": 7.4},
     {"id": "vbat", "pins": ["fuse.P2", "esc.VIN"], "volts": 7.4},
     {"id": "gnd", "pins": ["batt.-", "esc.GND"]},
     {"id": "m1_a", "pins": ["esc.M1+", "m1.M+"]},

@@ -1,12 +1,13 @@
 //! E-checks (specs/robowire.md §3, registered in specs/codes.md). Each check
 //! is individually callable; `run_checks` is the M0 composition (E01–04,
-//! E10–11, E20–21, E40–41). Bugs become rules: new statically-detectable
-//! failures get a code in codes.md first, then a function here.
+//! E10–11, E20–21, E40–41, E43–45). Bugs become rules: new
+//! statically-detectable failures get a code in codes.md first, then a
+//! function here.
 
 use crate::catalogue::{ElecCatalogue, PinDecl};
 use crate::schema::{split_pin, Bus, Netlist};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Severity of a check result. `Warn` implies `pass == true` — a warn row
 /// never blocks the CLI's exit status or the designer's overall verdict, it
@@ -546,6 +547,140 @@ pub fn e41_failsafe_chain(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResu
     Ok(ok(C, D, format!("stop chain complete: {}", fs.rx_loss)))
 }
 
+/// E43: a charge controller's declared charge profile (chemistry, cell
+/// count — `roboparts::ChargeProfile`) matches the battery wired to its
+/// `power_out` net (`SourceDecl::chemistry`/`cell_count`). A charger built
+/// for the wrong chemistry or cell count is a real overcharge/undercharge
+/// risk (wrong termination voltage), not a "charges slower" mismatch —
+/// exactly the E05 pattern (statically detectable, not a guess) applied to
+/// a charging pair instead of a motor/ESC pair. Skips (no opinion) wherever
+/// either side leaves its own field unset.
+pub fn e43_charge_profile_match(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult, String> {
+    const C: &str = "E43";
+    const D: &str = "charge controller's declared chemistry/cell-count matches the battery it charges";
+    for (inst, part_id) in &nl.instances {
+        let (part, _) = cat.get(part_id)?;
+        if part.kind != "charge-controller" {
+            continue;
+        }
+        let Some(profile) = &part.charge_profile else { continue };
+        let Some(elec) = &part.elec else { continue };
+        let Some((pin, _)) = elec.pins.iter().find(|(_, d)| d.role == "power_out") else { continue };
+        let endpoint = format!("{inst}.{pin}");
+        let Some(net) = nl.nets.iter().find(|n| n.pins.contains(&endpoint)) else { continue };
+        for p in &net.pins {
+            if p == &endpoint {
+                continue;
+            }
+            if pin_decl(nl, cat, p)?.role != "pos" {
+                continue;
+            }
+            let (batt_inst, _) = split_pin(p)?;
+            let batt_part_id = nl.instances.get(batt_inst).ok_or_else(|| format!("unknown instance '{batt_inst}'"))?;
+            let (batt_part, _) = cat.get(batt_part_id)?;
+            let Some(source) = batt_part.elec.as_ref().and_then(|e| e.source.as_ref()) else { continue };
+            let Some(chem) = &source.chemistry else { continue };
+            if &profile.chemistry != chem {
+                return Ok(fail(
+                    C,
+                    D,
+                    format!("{inst} is built to charge {} but {batt_inst} is {chem}", profile.chemistry),
+                ));
+            }
+            if let Some(cells) = source.cell_count {
+                if cells != profile.cell_count {
+                    return Ok(fail(
+                        C,
+                        D,
+                        format!("{inst} is a {}S charger but {batt_inst} is a {cells}S pack", profile.cell_count),
+                    ));
+                }
+            }
+        }
+    }
+    Ok(ok(C, D, "every charge controller's declared chemistry/cell-count matches the battery it charges".into()))
+}
+
+/// E44 (warn-tier): a multi-cell (`SourceDecl::cell_count > 1`) battery
+/// declares `has_bms: true`. Series lithium cells drift apart in charge over
+/// time; without balancing/protection somewhere, one cell can be pushed into
+/// overcharge while another is left under-charged — invisible from the
+/// pack's bare `+`/`-` terminals alone. Warn, not fail: plenty of real packs
+/// are safely charged via an external balance-lead-aware charger with no
+/// onboard BMS chip, so this flags "verify this," not a defect.
+pub fn e44_multicell_bms(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult, String> {
+    const C: &str = "E44";
+    const D: &str = "multi-cell battery packs declare balancing/protection (BMS)";
+    for (inst, part_id) in &nl.instances {
+        let (part, _) = cat.get(part_id)?;
+        let Some(elec) = &part.elec else { continue };
+        let Some(source) = &elec.source else { continue };
+        let Some(cells) = source.cell_count else { continue };
+        if cells > 1 && source.has_bms != Some(true) {
+            return Ok(warn(
+                C,
+                D,
+                format!(
+                    "{inst} is a {cells}S pack with no declared has_bms — verify it's charged via a \
+                     balance-aware charger or carries its own protection board"
+                ),
+            ));
+        }
+    }
+    Ok(ok(C, D, "every multi-cell battery declares balancing/protection".into()))
+}
+
+/// E45 (warn-tier): a fuse or PTC is reachable from the battery's positive
+/// terminal through the worst-case bridge graph (`crate::power::build` — the
+/// same switch/button/resistor/potentiometer/wiring/fuse/ptc/connector
+/// reachability E30/E31 use). Deliberately a graph walk, not a same-net
+/// check like E40's: a fuse is commonly wired either before or after the
+/// master switch, so only accepting one right next to `pos` would reject a
+/// perfectly normal ordering. Warn, not fail: E40 already makes a switch a
+/// hard tech-check requirement here; a fuse is a strong recommendation, not
+/// (yet) something that should retroactively fail every existing legal
+/// harness that predates this check.
+pub fn e45_battery_fuse(nl: &Netlist, cat: &ElecCatalogue) -> Result<CheckResult, String> {
+    const C: &str = "E45";
+    const D: &str = "a fuse/PTC protects the battery's positive path (recommended)";
+    let net_of = crate::graph::endpoint_net_index(nl);
+    let g = crate::power::build(nl, cat, &net_of)?;
+
+    let mut fuse_nets: BTreeSet<String> = BTreeSet::new();
+    for (inst, part_id) in &nl.instances {
+        let (part, _) = cat.get(part_id)?;
+        if !matches!(part.kind.as_str(), "fuse" | "ptc") {
+            continue;
+        }
+        let Some(elec) = &part.elec else { continue };
+        for pin in elec.pins.keys() {
+            if let Some(n) = net_of.get(&format!("{inst}.{pin}")) {
+                fuse_nets.insert(n.clone());
+            }
+        }
+    }
+
+    for (inst, part_id) in &nl.instances {
+        let (part, _) = cat.get(part_id)?;
+        let Some(elec) = &part.elec else { continue };
+        if elec.source.is_none() {
+            continue;
+        }
+        let Some((pin, _)) = elec.pins.iter().find(|(_, d)| d.role == "pos") else { continue };
+        let endpoint = format!("{inst}.{pin}");
+        let Some(pos_net) = net_of.get(&endpoint) else { continue };
+        let reach = crate::graph::reach_from(pos_net, &g.undirected, &g.forward);
+        if !reach.iter().any(|n| fuse_nets.contains(n)) {
+            return Ok(warn(
+                C,
+                D,
+                format!("{endpoint}'s positive path reaches no fuse/PTC anywhere downstream"),
+            ));
+        }
+    }
+    Ok(ok(C, D, "battery positive is protected by a fuse/PTC".into()))
+}
+
 /// The M0 composition.
 pub fn run_checks(nl: &Netlist, cat: &ElecCatalogue) -> Result<Vec<CheckResult>, String> {
     let mut results = vec![
@@ -561,6 +696,9 @@ pub fn run_checks(nl: &Netlist, cat: &ElecCatalogue) -> Result<Vec<CheckResult>,
         e33_led_current_limit(nl, cat)?,
         e40_power_switch(nl, cat)?,
         e41_failsafe_chain(nl, cat)?,
+        e43_charge_profile_match(nl, cat)?,
+        e44_multicell_bms(nl, cat)?,
+        e45_battery_fuse(nl, cat)?,
     ];
     results.extend(crate::power::power_checks(nl, cat)?);
     Ok(results)

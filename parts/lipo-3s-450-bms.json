@@ -1,0 +1,29 @@
+{
+  "id": "lipo-3s-450-bms",
+  "kind": "battery",
+  "mass_g": 37.0,
+  "provisional": true,
+  "notes": "3S 450mAh with onboard protection/balancing — same cell/capacity figures as lipo-3s-450, `has_bms: true` so it doesn't trip E44. Used by the curriculum's stage-02 regulator-mismatch lesson, which needs a 3S pack but isn't trying to demonstrate the BMS gap at the same time.",
+  "elec": {
+    "pins": {
+      "+": {
+        "role": "pos",
+        "required": true
+      },
+      "-": {
+        "role": "gnd",
+        "required": true
+      }
+    },
+    "source": {
+      "volts": 11.1,
+      "c_rating": 25.0,
+      "capacity_mah": 450.0,
+      "r_internal_ohm": 0.12,
+      "chemistry": "lipo",
+      "cell_count": 3,
+      "has_bms": true
+    }
+  },
+  "description": "A protected three-cell lithium battery — the same cells and capacity as lipo-3s-450, but with its own onboard balancing/protection circuit."
+}

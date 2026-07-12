@@ -19,7 +19,10 @@
       "volts": 11.1,
       "c_rating": 25.0,
       "capacity_mah": 450.0,
-      "r_internal_ohm": 0.12
+      "r_internal_ohm": 0.12,
+      "chemistry": "lipo",
+      "cell_count": 3,
+      "has_bms": false
     }
   },
   "description": "A bigger, higher-voltage three-cell pack for builds that need more headroom than the 2S 260mAh option — more punch per motor, at the cost of more mass and a stricter voltage-range check on every downstream part."

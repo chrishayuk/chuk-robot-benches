@@ -1,12 +1,13 @@
 {
   "name": "04-brain-and-radio",
   "instances": {
-    "batt": "lipo-2s-260", "sw": "power-switch-slide", "esc": "bbb-dual-esc", "m1": "n20-motor-6v",
+    "batt": "lipo-2s-260-bms", "sw": "power-switch-slide", "fuse": "fuse-ptc-5a", "esc": "bbb-dual-esc", "m1": "n20-motor-6v",
     "mcu": "rp2350-zero", "rx": "elrs-rx"
   },
   "nets": [
     {"id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4},
-    {"id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 7.4},
+    {"id": "vbat_fuse", "pins": ["sw.out", "fuse.P1"], "volts": 7.4},
+    {"id": "vbat", "pins": ["fuse.P2", "esc.VIN"], "volts": 7.4},
     {"id": "v5", "pins": ["esc.BEC5V", "mcu.5V", "rx.VIN"], "volts": 5.0},
     {"id": "gnd", "pins": ["batt.-", "esc.GND", "mcu.GND", "rx.GND"]},
     {"id": "m1_a", "pins": ["esc.M1+", "m1.M+"]},

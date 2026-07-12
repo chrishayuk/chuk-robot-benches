@@ -26,6 +26,9 @@ here first, then a check in the owning tool. Codes are never renumbered or reuse
 | E40 | switch/removable link in main power path, reachable (tech-check) | fail |
 | E41 | failsafe stop chain declared and complete | fail |
 | E42 | exposed-conductor on high-current nets without insulation class | warn |
+| E43 | charge controller's declared chemistry/cell-count matches the battery it charges | fail |
+| E44 | multi-cell battery pack declares balancing/protection (BMS) | warn |
+| E45 | fuse/PTC reachable on the battery's positive path | warn |
 
 ## D-codes — design/geometry (owner: robocad, design-servers §2; numbering provisional until robocad M0 freezes it)
 

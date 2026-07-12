@@ -1,12 +1,13 @@
 {
   "name": "02-regulator-broken",
   "instances": {
-    "batt": "lipo-3s-450", "sw": "power-switch-slide", "reg": "reg-5v-mini",
+    "batt": "lipo-3s-450-bms", "sw": "power-switch-slide", "fuse": "fuse-ptc-5a", "reg": "reg-5v-mini",
     "r1": "resistor-330r", "led1": "led-red-5mm"
   },
   "nets": [
     { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 11.1 },
-    { "id": "vbat", "pins": ["sw.out", "reg.VIN"], "volts": 11.1 },
+    { "id": "vbat_fuse", "pins": ["sw.out", "fuse.P1"], "volts": 11.1 },
+    { "id": "vbat", "pins": ["fuse.P2", "reg.VIN"], "volts": 11.1 },
     { "id": "v5", "pins": ["reg.OUT", "r1.P1"], "volts": 5.0 },
     { "id": "led_feed", "pins": ["r1.P2", "led1.A"] },
     { "id": "gnd", "pins": ["batt.-", "reg.GND", "led1.K"] }

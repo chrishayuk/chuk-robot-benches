@@ -1,0 +1,18 @@
+{
+  "name": "lesson-e43-cell-count-mismatch",
+  "instances": {
+    "batt": "lipo-3s-450-bms", "sw": "power-switch-slide", "fuse": "fuse-ptc-5a",
+    "panel": "solar-panel-9v-2w", "cc": "charge-controller-small",
+    "r1": "resistor-330r", "led1": "led-red-5mm"
+  },
+  "nets": [
+    { "id": "panel_out", "pins": ["panel.OUT", "cc.VIN"], "volts": 9.0 },
+    { "id": "vbat_sw", "pins": ["batt.+", "cc.OUT", "sw.in"], "volts": 7.4 },
+    { "id": "vbat_fuse", "pins": ["sw.out", "fuse.P1"], "volts": 7.4 },
+    { "id": "feed", "pins": ["fuse.P2", "r1.P1"], "volts": 7.4 },
+    { "id": "led_feed", "pins": ["r1.P2", "led1.A"] },
+    { "id": "gnd", "pins": ["batt.-", "panel.GND", "cc.GND", "led1.K"] }
+  ],
+  "buses": [],
+  "failsafe": null
+}

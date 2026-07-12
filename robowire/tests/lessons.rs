@@ -108,13 +108,25 @@ fn stage_07_two_wheel_drive_legal_and_broken() {
 }
 
 #[test]
+fn stage_08_battery_protection_legal_and_broken() {
+    // A standalone vignette (like 1-2), revisiting stage 3's motor-driver
+    // shape with a new lens: is the battery itself protected? One root
+    // mistake — swap the protected pack for a bare one AND delete the
+    // inline fuse — trips two warn-tier codes at once, the same "one
+    // mistake, two consequences" pattern stage 5 uses for E02+E32.
+    assert_legal("08-battery-protection");
+    assert_fails_exactly("08-battery-protection-broken", &["E44", "E45"]);
+}
+
+#[test]
 fn batt_and_sw_persist_across_every_stage() {
     // battery/switch are the one constant every stage keeps, even across the
-    // foundational vignettes (1: bare basics, 2: regulator) that don't
-    // literally accumulate onto each other instance-for-instance yet.
+    // foundational vignettes (1: bare basics, 2: regulator, 8: battery
+    // protection) that don't literally accumulate onto each other
+    // instance-for-instance yet.
     let stages = [
         "01-basics", "02-regulator", "03-motor-driver", "04-brain-and-radio", "05-shared-5v-rail",
-        "06-sensor-bus", "07-two-wheel-drive",
+        "06-sensor-bus", "07-two-wheel-drive", "08-battery-protection",
     ];
     for name in stages {
         let (nl, _) = load(name);

@@ -4,7 +4,7 @@
 //! agreeing with a correct design.
 
 use robowire::catalogue::ElecCatalogue;
-use robowire::{run_checks, Netlist};
+use robowire::{run_checks, Netlist, Tier};
 use std::path::PathBuf;
 
 fn repo_root() -> PathBuf {
@@ -31,6 +31,15 @@ fn code_result(nl: &Netlist, cat: &ElecCatalogue, code: &str) -> bool {
         .find(|c| c.code == code)
         .unwrap_or_else(|| panic!("no check {code}"))
         .pass
+}
+
+fn code_tier(nl: &Netlist, cat: &ElecCatalogue, code: &str) -> Tier {
+    run_checks(nl, cat)
+        .unwrap()
+        .into_iter()
+        .find(|c| c.code == code)
+        .unwrap_or_else(|| panic!("no check {code}"))
+        .tier
 }
 
 #[test]
@@ -84,6 +93,50 @@ fn planted_missing_switch_fails_e40() {
     }
     nl.instances.remove("sw");
     assert!(!code_result(&nl, &cat, "E40"), "E40 must catch the missing switch");
+}
+
+#[test]
+fn mvp_harness_warns_e44_and_e45_on_its_unprotected_bare_battery() {
+    // The MVP wedge harness deliberately uses the bare `lipo-2s-260` (no
+    // declared BMS) with no fuse anywhere in its power path — both should
+    // warn (not fail: `mvp_harness_passes_all_checks` still holds, since
+    // Warn implies pass == true).
+    let (nl, cat) = load();
+    assert!(code_result(&nl, &cat, "E44"), "E44 is warn-tier, so pass stays true");
+    assert_eq!(code_tier(&nl, &cat, "E44"), Tier::Warn, "bare battery with no has_bms should warn E44");
+    assert!(code_result(&nl, &cat, "E45"), "E45 is warn-tier, so pass stays true");
+    assert_eq!(code_tier(&nl, &cat, "E45"), Tier::Warn, "no fuse anywhere should warn E45");
+}
+
+#[test]
+fn protected_and_fused_battery_clears_e44_and_e45_warnings() {
+    let (mut nl, cat) = load();
+    // Swap in the protected battery variant, and splice a fuse into the
+    // existing switch->ESC leg (mirrors how the harness/lessons curriculum
+    // was retrofitted).
+    nl.instances.insert("batt".into(), "lipo-2s-260-bms".into());
+    nl.instances.insert("fuse".into(), "fuse-ptc-5a".into());
+    for net in nl.nets.iter_mut() {
+        if net.id == "vbat" {
+            for p in net.pins.iter_mut() {
+                if p == "sw.out" {
+                    *p = "fuse.P2".into();
+                }
+            }
+        }
+    }
+    nl.nets.push(robowire::schema::Net {
+        id: "vbat_fuse".into(),
+        pins: vec!["sw.out".into(), "fuse.P1".into()],
+        volts: Some(7.4),
+        signal: None,
+        gauge_awg: None,
+        length_mm: None,
+    });
+    assert_eq!(code_tier(&nl, &cat, "E44"), Tier::Fail, "has_bms:true should clear E44's warn");
+    assert!(code_result(&nl, &cat, "E44"));
+    assert_eq!(code_tier(&nl, &cat, "E45"), Tier::Fail, "a fuse in the power path should clear E45's warn");
+    assert!(code_result(&nl, &cat, "E45"));
 }
 
 #[test]

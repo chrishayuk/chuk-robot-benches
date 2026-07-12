@@ -1,0 +1,29 @@
+{
+  "id": "lipo-2s-260-bms",
+  "kind": "battery",
+  "mass_g": 20.0,
+  "provisional": true,
+  "notes": "2S 260mAh with onboard protection/balancing — same cell/capacity figures as lipo-2s-260, `has_bms: true` so it doesn't trip E44. This is the numbered curriculum's reference battery (harness/lessons/*.json): the teaching sequence is meant to model correct baseline practice, not the exact gap E44/E45 exist to catch. `lipo-2s-260` (bare, no BMS) stays reserved for example-solar-charging-demo.json and the E43 lesson, which deliberately demonstrate that gap.",
+  "elec": {
+    "pins": {
+      "+": {
+        "role": "pos",
+        "required": true
+      },
+      "-": {
+        "role": "gnd",
+        "required": true
+      }
+    },
+    "source": {
+      "volts": 7.4,
+      "c_rating": 30.0,
+      "capacity_mah": 260.0,
+      "r_internal_ohm": 0.18,
+      "chemistry": "lipo",
+      "cell_count": 2,
+      "has_bms": true
+    }
+  },
+  "description": "A protected two-cell lithium battery — the same cells and capacity as lipo-2s-260, but with its own onboard balancing/protection circuit, so a design built around it doesn't depend on an external balance-aware charger to stay safe."
+}

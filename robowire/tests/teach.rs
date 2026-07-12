@@ -37,7 +37,10 @@ fn explain_error_is_case_insensitive_and_reports_unknown_codes_as_none() {
 
 #[test]
 fn every_explanation_has_non_empty_what_why_fix() {
-    for code in ["E01", "E02", "E03", "E04", "E10", "E11", "E20", "E21", "E30", "E31", "E32", "E33", "E40", "E41"] {
+    for code in [
+        "E01", "E02", "E03", "E04", "E10", "E11", "E20", "E21", "E30", "E31", "E32", "E33", "E40", "E41", "E43",
+        "E44", "E45",
+    ] {
         let e = robowire::teach::explain_error(code).unwrap_or_else(|| panic!("missing {code}"));
         assert!(!e.what.is_empty() && !e.why.is_empty() && !e.fix.is_empty(), "{code} has an empty field");
     }

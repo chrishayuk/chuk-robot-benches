@@ -2,7 +2,7 @@
 //! shared `roboparts` schema (review finding resolved: no more twin structs
 //! over the same files).
 
-pub use roboparts::{sha256_hex, BusDecl, Catalogue, Elec, Part, PinDecl, SourceDecl};
+pub use roboparts::{sha256_hex, BusDecl, Catalogue, ChargeProfile, Elec, Part, PinDecl, SourceDecl};
 
 /// Legacy aliases (robowire grew up calling these Elec*).
 pub type ElecPart = roboparts::Part;

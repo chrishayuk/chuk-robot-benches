@@ -19,7 +19,10 @@
       "volts": 7.4,
       "c_rating": 30.0,
       "capacity_mah": 260.0,
-      "r_internal_ohm": 0.18
+      "r_internal_ohm": 0.18,
+      "chemistry": "lipo",
+      "cell_count": 2,
+      "has_bms": false
     }
   },
   "description": "The robot's fuel tank: a two-cell lithium battery. Everything on the robot ultimately draws its power from here."

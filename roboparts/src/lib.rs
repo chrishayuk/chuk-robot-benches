@@ -121,6 +121,37 @@ pub struct SourceDecl {
     pub capacity_mah: Option<f64>,
     #[serde(default)]
     pub r_internal_ohm: Option<f64>,
+    /// Cell chemistry (e.g. "lipo", "lifepo4", "nimh") — checked against a
+    /// charge controller's own `ChargeProfile::chemistry` by robowire's E43.
+    /// `None` for a pack that hasn't been classified yet (E43 skips it,
+    /// nothing fabricated).
+    #[serde(default)]
+    pub chemistry: Option<String>,
+    /// Series cell count (e.g. 2 for a "2S" pack) — checked against a charge
+    /// controller's own `ChargeProfile::cell_count` by E43, and against this
+    /// pack's own declared `has_bms` by E44 (a multi-cell pack needs
+    /// balancing/protection somewhere).
+    #[serde(default)]
+    pub cell_count: Option<u32>,
+    /// Whether this pack carries its own onboard protection/balancing (a
+    /// BMS). `None`/`Some(false)` both read as "not declared" — robowire's
+    /// E44 warns on any multi-cell pack that isn't `Some(true)`.
+    #[serde(default)]
+    pub has_bms: Option<bool>,
+}
+
+/// What a `charge-controller`-kind part is actually built to charge — its
+/// own declared chemistry/cell-count target, checked by robowire's E43
+/// against the `SourceDecl` of whatever battery is wired to its `power_out`
+/// pin. A charger built for the wrong chemistry or cell count is a real
+/// overcharge/undercharge risk (wrong termination voltage), not a "charges
+/// slower" mismatch.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ChargeProfile {
+    pub chemistry: String,
+    pub cell_count: u32,
+    #[serde(default)]
+    pub termination_v: Option<f64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +180,9 @@ pub struct Part {
     pub esc: Option<EscProps>,
     #[serde(default)]
     pub elec: Option<Elec>,
+    /// `charge-controller`-kind parts only — see `ChargeProfile`.
+    #[serde(default)]
+    pub charge_profile: Option<ChargeProfile>,
     /// Rated current draw in mA at `nominal_v` — together they let robowire's
     /// run mode derive an equivalent resistance (`nominal_v / (current_ma/1000)`)
     /// and compute LIVE current via Ohm's law against whatever voltage the

@@ -2,7 +2,7 @@
 //! Part schema, one hash rule, N consumers; review finding resolved).
 
 pub use roboparts::{
-    BusDecl, Catalogue, Elec, MotorProps, Part, PinDecl, SourceDecl, TyreProps,
+    BusDecl, Catalogue, ChargeProfile, Elec, MotorProps, Part, PinDecl, SourceDecl, TyreProps,
 };
 
 /// Kept for source compatibility with earlier partial-mirror names.

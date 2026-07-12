@@ -1,9 +1,10 @@
 {
   "name": "01-basics-broken",
-  "instances": { "batt": "lipo-2s-260", "sw": "power-switch-slide", "led1": "led-red-5mm" },
+  "instances": { "batt": "lipo-2s-260-bms", "sw": "power-switch-slide", "fuse": "fuse-ptc-5a", "led1": "led-red-5mm" },
   "nets": [
     { "id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4 },
-    { "id": "feed", "pins": ["sw.out", "led1.A"], "volts": 7.4 },
+    { "id": "vbat_fuse", "pins": ["sw.out", "fuse.P1"], "volts": 7.4 },
+    { "id": "feed", "pins": ["fuse.P2", "led1.A"], "volts": 7.4 },
     { "id": "gnd", "pins": ["led1.K", "batt.-"] }
   ],
   "buses": [],

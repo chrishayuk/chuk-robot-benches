@@ -122,6 +122,15 @@ v0.1 set, drawn from how ant-class bots actually die:
   declared and complete
 - E42 exposed-conductor warnings for high-current nets without declared insulation class
 
+**Battery/charging safety**
+- E43 a charge controller's declared charge profile (chemistry, cell count) matches the
+  battery wired to its output — fail-tier, skips wherever either side leaves its own field
+  unset (nothing fabricated)
+- E44 a multi-cell battery pack declares its own balancing/protection (`has_bms`) — warn-tier
+- E45 a fuse or PTC is reachable from the battery's positive terminal (via the same
+  worst-case bridge graph E30/E31 use, so a fuse wired either before or after the master
+  switch counts) — warn-tier
+
 Check set is extensible; every new physical failure in the lab that was statically
 detectable becomes a new E-code (the compose-linker discipline: bugs become rules).
 
@@ -135,10 +144,10 @@ variant per code (`lesson-<code>-<name>.json`), auto-verified by
 run the checker, then read `explain-error` for the code it names.
 
 `harness/lessons/NN-slug[.json]/NN-slug-broken.json` is a separate, ordered curriculum —
-"start from the real basics and work up." Stages 1-2 are standalone foundational
-vignettes (neither needs a motor at all); the real accumulating build
-(`motor_stages_strictly_accumulate`, `robowire/tests/lessons.rs`) runs from stage 3
-onward, each a strict superset of the last: `01-basics` (battery/switch/resistor/LED,
+"start from the real basics and work up." Stages 1, 2, and 8 are standalone foundational
+vignettes (none needs the full accumulated build); the real accumulating build
+(`motor_stages_strictly_accumulate`, `robowire/tests/lessons.rs`) runs stages 3 through 7,
+each a strict superset of the last: `01-basics` (battery/switch/resistor/LED,
 E33) → `02-regulator` (+standalone 5V regulator, no ESC/BEC involved — a 3S battery on a
 part only rated to 9V, E02, the classic wrong-cell-count mismatch) → `03-motor-driver`
 (+ESC+motor, E40) → `04-brain-and-radio` (+MCU+receiver, BEC/PWM/UART/failsafe, E41) →
@@ -150,6 +159,16 @@ instead of through the BEC) → `06-sensor-bus` (+2×ToF, the dual-0x29 classic,
 motors wired to the same channel" mistake, E01). `rp2350-zero`'s `GP6`/`GP7` gained
 `analog`/`pwm` capabilities respectively to make room for this and the sensor catalogue
 below, widening the catalogue rather than working around it.
+
+`08-battery-protection` is a standalone coda revisiting stage 3's motor-driver shape
+through a different lens: is the battery itself protected? Its legal file uses the
+protected `lipo-2s-260-bms` pack with an inline `fuse-ptc-5a`; its broken variant swaps in
+the bare `lipo-2s-260` and deletes the fuse — one mistake, two warn-tier consequences,
+E44 (no declared `has_bms`) and E45 (no fuse/PTC reachable from the battery's positive
+terminal), the same "one mistake, two codes" pattern stage 5 uses for E02+E32. (Every
+other stage's battery/fuse pairing was retrofitted to the protected/fused parts too, so
+stages 1-7 stay fully clean under this stricter battery-safety pass — only this stage's
+broken variant intentionally regresses to the bare, unprotected pack.)
 
 The sensor catalogue also grew a `light` kind (`line-sensor-analog` — an analog
 reflectance/photoresistor line-and-edge sensor, not on any bus, sharing `tof`/`imu`'s

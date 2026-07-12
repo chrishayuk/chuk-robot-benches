@@ -1,13 +1,14 @@
 {
   "name": "06-sensor-bus-broken",
   "instances": {
-    "batt": "lipo-2s-260", "sw": "power-switch-slide", "esc": "bbb-dual-esc", "m1": "n20-motor-6v",
+    "batt": "lipo-2s-260-bms", "sw": "power-switch-slide", "fuse": "fuse-ptc-5a", "esc": "bbb-dual-esc", "m1": "n20-motor-6v",
     "mcu": "rp2350-zero", "rx": "elrs-rx", "lifter": "servo-9g-lifter", "tof1": "vl53l0x-breakout", "tof2": "vl53l0x-breakout",
     "light": "line-sensor-analog", "env": "env-bme280"
   },
   "nets": [
     {"id": "vbat_sw", "pins": ["batt.+", "sw.in"], "volts": 7.4},
-    {"id": "vbat", "pins": ["sw.out", "esc.VIN"], "volts": 7.4},
+    {"id": "vbat_fuse", "pins": ["sw.out", "fuse.P1"], "volts": 7.4},
+    {"id": "vbat", "pins": ["fuse.P2", "esc.VIN"], "volts": 7.4},
     {"id": "v5", "pins": ["esc.BEC5V", "mcu.5V", "rx.VIN", "lifter.+"], "volts": 5.0},
     {"id": "v33", "pins": ["mcu.3V3", "tof1.VIN", "tof2.VIN", "light.VIN", "env.VIN"], "volts": 3.3},
     {"id": "gnd", "pins": ["batt.-", "esc.GND", "mcu.GND", "rx.GND", "lifter.-", "tof1.GND", "tof2.GND", "light.GND", "env.GND"]},
