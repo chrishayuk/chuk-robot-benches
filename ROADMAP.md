@@ -1,12 +1,12 @@
 # Roadmap — the robot programme
 
-One page, cross-spec, kept honest: phases sequence the six specs' milestone ladders
+One page, cross-spec, kept honest: phases sequence the seven specs' milestone ladders
 against what is actually built. Every phase ends in an acceptance gate that is a
 verifiable artifact (hash, report, or green suite) — never a vibe. Owning specs:
 [chuk-arena](specs/chuk-arena.md) · [robotspec](specs/robotspec.md) ·
 [robotspec-viewer](specs/robotspec-viewer.md) · [robowire](specs/robowire.md) ·
-[design-servers](specs/design-servers.md) · [codes](specs/codes.md) ·
-cell80 (external companion spec).
+[energy-sim](specs/energy-sim.md) · [design-servers](specs/design-servers.md) ·
+[codes](specs/codes.md) · cell80 (external companion spec).
 
 ## Phase 0 — done (2026-07-10 → 11)
 
@@ -48,6 +48,8 @@ cell80 (external companion spec).
 | Authentic mode (RV32 executor in-loop) | chuk-arena M2 | **gated on cell80 M2 (external)** — fast-mode results retroactively re-scored per §7 |
 | Shared derivation library (mass/CoG/hull/tip): one crate, consumed by viewer + arena-plant + robotspec | robotspec M1 = viewer M1 | one codebase, N consumers, zero drift by construction |
 | ✅ robowire M1: power-budget checks E30–32 (worst-case draw vs C-rating/regulator `max_a`, AWG ampacity, MCU/motor-rail brownout warning) + live wire IR-drop/battery sag in run mode, single-sourced; power graph derivation (`robowire::power_graph`) + wiring mass into RobotSpec's `power:`/`mass_wiring_g` fields, retiring the flat `harness-allowance` placeholder | robowire M1 | **done:** `robowire power harness/mvp-wedge-harness.json --robot robots/mvp-wedge.json` derives the merged power section + wiring-inclusive mass, no hand-entered duplicates (X03), D02 re-evaluated against the corrected total |
+| ✅ robowire teaching layer: numbered curriculum (`harness/lessons/`, 7 stages — 1-2 standalone foundational vignettes, 3-7 a strict accumulating build) + in-designer teaching mode (palette stays usable mid-lesson, not locked) + `explain`/`explain-error` CLI and wasm export, single-sourced prose (`robowire::teach`) | robowire (informal, between M1 and M2) | **done:** per-stage legal/broken pairs each fail exactly their named code; full headless browser regression suite passing against the real designer artifact |
+| ✅ robowire component-centric run mode + catalogue breadth: the MCU is a real, drivable component — run-mode signal source resolved through the actual netlist wiring (`robowire::signal`), never pinned to a motor instance; multi-reading sensors (`roboparts::Part::readings`, e.g. `env-bme280`'s temp/humidity/pressure as three independent live values, not one collapsed number); new kinds/parts (light/env/longer-range tof, brushless drive motor+ESC, solar panel + charge controller per `energy-sim.md` M0, second brushed motor/ESC voltage class); new **E05** check (motor winding type vs its driving ESC's declared support, `roboparts::EscProps`) | robowire (informal, between M1 and M2) | **done:** full catalogue coverage (every part exercised in a lesson/example/robot harness), every new kind checked by existing E-codes with no bespoke logic where the existing role-based checks already generalized |
 | robowire M0.5: interactive run mode, in the standalone `robosim` crate — click-to-toggle switch/button, throttle + fake-sensor + dial controls, event-driven net energization, real Ohm's-law voltage/current per net and component incl. a potentiometer dimmer (not fixed figures), animated wire-flow, draggable wire bends (2D/3D/while running), weighted auto-arrange | robowire M0.5 | green `run_state` test suite against the MVP wedge harness + dedicated demo harnesses (switch+LED+motor+sensor+button; potentiometer dimmer), incl. voltage-changes-current-changes tests |
 
 ## Phase 3 — fields, search, and the AI design loop
@@ -58,7 +60,7 @@ cell80 (external companion spec).
 | Stateful weapon/damage systems; strategy suite §5.3 end-to-end | chuk-arena M3 | claims with error bars, corpus-hash cited |
 | Design search v1 (Sobol → CMA-ES/NSGA-II, robustness-weighted) → Pareto front + physical A/B shortlist | chuk-arena M3 | pre-registered predicted ranking for Station-1 validation |
 | RobotSpec derivation pipeline v0 (CAD export → derived artifact, committed) | robotspec M2 | derived sections carry pipeline version |
-| robowire M2: SVG diagram + generated bench procedure | robowire M2 | first physical harness verified against its own checklist |
+| ✅ robowire M2 (bench procedure half): generated Markdown bench verification procedure (`robowire::bench`, `robowire bench <netlist> [--out FILE]`) — continuity checks, polarity list, staged power-up (rails unloaded → power distribution → brain → sensors → drive → full), expected I²C bus scan, all reusing the checker's own helpers so the procedure can never disagree with `robowire check`. SVG diagram render not yet started. | robowire M2 | **done (bench half):** `robowire/tests/bench.rs` green against real harnesses; first physical harness verified against its own checklist is a real-world step, not a code milestone — it happens whenever a harness from this repo actually gets built |
 | design-servers M0–M1: robowire server, then robocad server | design-servers | agent transcript: propose → E-fail → fix → pass, no human edits |
 | Viewer M2: mesh ingest + parametric-vs-mesh centroid delta row | robotspec-viewer M2 | built-in pipeline cross-check visible |
 

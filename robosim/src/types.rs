@@ -11,12 +11,16 @@ pub struct RunInputs {
     /// button instance -> held?
     #[serde(default)]
     pub buttons: BTreeMap<String, bool>,
-    /// MCU pin endpoint (e.g. "mcu.GP2") -> commanded signal in [-1.0, 1.0].
-    /// Keyed by the pin that would really be carrying this PWM signal, not
-    /// by whatever motor it happens to end up driving — a stand-in for the
-    /// signal generator/RC receiver you'd hook up on a real bench before any
-    /// firmware exists, not for the firmware itself (see `robowire::signal`
-    /// for how this reaches a motor's own throttle).
+    /// MCU pin endpoint (e.g. "mcu.GP2") -> PWM pulse width in microseconds,
+    /// the real quantity a bench signal generator/RC receiver would actually
+    /// be putting on that pin (standard RC/ESC convention: 1000µs = full
+    /// reverse, 1500µs = neutral, 2000µs = full forward) — not an abstract
+    /// throttle fraction. Keyed by the pin that would really be carrying
+    /// this signal, not by whatever motor it happens to end up driving (see
+    /// `robowire::signal` for how this reaches a motor's own throttle).
+    /// Missing = neutral (1500), same as a signal generator left at its
+    /// centre detent. `motor::compute` is the one place this gets converted
+    /// to a [-1.0, 1.0] throttle fraction for the Ohm's-law current math.
     #[serde(default)]
     pub pwm_signals: BTreeMap<String, f64>,
     /// potentiometer instance -> dial position in [0.0, 1.0], scaling its

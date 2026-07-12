@@ -133,7 +133,7 @@ fn led_current_scales_when_supply_voltage_changes() {
 fn motor_current_is_ohms_law_and_scales_with_supply_voltage() {
     let (nl, cat) = demo();
     let mut inputs = inputs_with_switch(true);
-    inputs.pwm_signals.insert("mcu.GP2".to_string(), 1.0);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 2000.0); // full forward (2000µs = +1.0 throttle)
     let st = run_state(&nl, &cat, &inputs).unwrap();
 
     // n20-motor-6v: stall_current_a=1.6, nominal_v=6.0 -> r_winding = 3.75Ω.
@@ -165,7 +165,7 @@ fn motor_reports_powered_independent_of_throttle() {
     let (nl, cat) = demo();
 
     let mut idle = inputs_with_switch(true);
-    idle.pwm_signals.insert("mcu.GP2".to_string(), 0.0);
+    idle.pwm_signals.insert("mcu.GP2".to_string(), 1500.0); // neutral (0.0 throttle)
     let st = run_state(&nl, &cat, &idle).unwrap();
     assert_eq!(st.instances["m1"].powered, Some(true), "powered rail, zero throttle -> still powered");
     assert_eq!(st.instances["m1"].spin, Some(0.0));
@@ -180,7 +180,7 @@ fn motor_reports_powered_independent_of_throttle() {
 fn motor_current_also_shows_on_its_own_terminal_wires() {
     let (nl, cat) = demo();
     let mut inputs = inputs_with_switch(true);
-    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.7);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 1850.0); // 1850µs = 0.7 throttle
     let st = run_state(&nl, &cat, &inputs).unwrap();
 
     // The current visibly flowing INTO the motor (m1_a/m1_b, its own two
@@ -208,7 +208,7 @@ fn fixed_power_device_current_matches_its_equivalent_resistance() {
 fn battery_current_is_the_sum_of_every_live_load() {
     let (nl, cat) = demo();
     let mut inputs = inputs_with_switch(true);
-    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.7);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 1850.0); // 1850µs = 0.7 throttle
     let st = run_state(&nl, &cat, &inputs).unwrap();
 
     let esc_amps = 15.0_f64 / 1000.0 * (7.4 / 7.4);
@@ -230,7 +230,7 @@ fn battery_current_is_the_sum_of_every_live_load() {
 fn battery_terminal_voltage_sags_proportional_to_its_own_current() {
     let (nl, cat) = demo();
     let mut inputs = inputs_with_switch(true);
-    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.7);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 1850.0); // 1850µs = 0.7 throttle
     let st = run_state(&nl, &cat, &inputs).unwrap();
 
     // lipo-2s-260 declares r_internal_ohm = 0.18.
@@ -300,8 +300,8 @@ fn switch_open_voltage_present_at_battery_terminal_only() {
 fn mvp_wedge_motors_spin_independently_by_channel() {
     let (nl, cat) = wedge();
     let mut inputs = inputs_with_switch(true);
-    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.5);
-    inputs.pwm_signals.insert("mcu.GP3".to_string(), -0.3);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 1750.0); // 1750µs = 0.5 throttle
+    inputs.pwm_signals.insert("mcu.GP3".to_string(), 1350.0); // 1350µs = -0.3 throttle (reverse)
     let st = run_state(&nl, &cat, &inputs).unwrap();
     assert_eq!(st.instances["m_l"].spin, Some(0.5));
     assert_eq!(st.instances["m_r"].spin, Some(-0.3));
@@ -319,7 +319,7 @@ fn mvp_wedge_signal_is_pinned_to_the_mcu_pin_not_the_motor() {
     // since nothing actually drives esc.S2.
     let (nl, cat) = wedge();
     let mut inputs = inputs_with_switch(true);
-    inputs.pwm_signals.insert("mcu.GP2".to_string(), 0.8);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 1900.0); // 1900µs = 0.8 throttle
     let st = run_state(&nl, &cat, &inputs).unwrap();
     assert_eq!(st.instances["m_l"].spin, Some(0.8));
     assert_eq!(st.instances["m_r"].spin, Some(0.0));
@@ -340,7 +340,7 @@ fn stage3_motor_driver_never_spins_without_a_brain_wired_up() {
     // exactly why, rather than quietly taking whatever value is handed to it.
     let (nl, cat) = load("harness/lessons/03-motor-driver.json");
     let mut inputs = inputs_with_switch(true);
-    inputs.pwm_signals.insert("mcu.GP2".to_string(), 1.0);
+    inputs.pwm_signals.insert("mcu.GP2".to_string(), 2000.0); // full forward — still irrelevant, nothing is wired to it here
     let st = run_state(&nl, &cat, &inputs).unwrap();
     assert_eq!(st.instances["m1"].powered, Some(true));
     assert_eq!(st.instances["m1"].spin, Some(0.0));

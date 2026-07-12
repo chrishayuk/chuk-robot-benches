@@ -59,11 +59,13 @@ pub fn compute(
                     if source_pin.is_none() {
                         reason = Some("no signal source wired to this channel".to_string());
                     }
-                    let throttle = source_pin
-                        .as_ref()
-                        .and_then(|p| inputs.pwm_signals.get(p).copied())
-                        .unwrap_or(0.0)
-                        .clamp(-1.0, 1.0);
+                    // Real RC/ESC convention: 1000µs = full reverse, 1500µs =
+                    // neutral, 2000µs = full forward — the actual quantity a
+                    // bench signal generator would be set to, not an
+                    // abstract fraction. Converted to a throttle fraction
+                    // once, here, for the Ohm's-law current math below.
+                    let pulse_us = source_pin.as_ref().and_then(|p| inputs.pwm_signals.get(p).copied()).unwrap_or(1500.0);
+                    let throttle = ((pulse_us - 1500.0) / 500.0).clamp(-1.0, 1.0);
                     spin = throttle;
                     let esc_part_id = nl.instances.get(esc_inst).ok_or_else(|| format!("unknown instance '{esc_inst}'"))?;
                     let (esc_part, _) = cat.get(esc_part_id)?;

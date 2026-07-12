@@ -263,16 +263,27 @@ rather than a guess.
    None` for any bare, non-merged call).
 3. **Diagram render** — logical schematic view (rails left-to-right, buses grouped),
    generated from the netlist; SVG output suitable for the inspector and the build sheet.
-4. **Bench verification procedure (the physical test)** — a generated, ordered checklist
-   binding design to build:
-   - continuity list: "probe batt.+ ↔ esc.VIN: expect <0.5Ω; probe batt.+ ↔ batt.−:
-     expect open (switch off)"
-   - polarity list before first power
-   - staged smoke-test order: rails unloaded → MCU only → sensors → ESC, no motors →
-     full, with expected voltages/currents at each stage
-   - bus enumeration: expected I²C scan result (the address map, post-reassignment)
+4. **Bench verification procedure (the physical test) — done.** `robowire::bench` +
+   `robowire bench <netlist.json> [--out FILE]`, a generated, ordered Markdown checklist
+   binding design to build, reusing the exact same rule/derivation logic `checks.rs`
+   already encodes (`bus_final_addresses`, `pin_decl`) so the procedure can never
+   disagree with what the checker itself already knows:
+   - continuity checks: a dead-short check on every battery, an open/closed pair for
+     every switch/removable-link directly in a battery's own path, and a
+     ground-unification check from every battery's own ground pin to every other
+     instance's ground pin (the classic isolated-ground mistake, caught with a meter)
+   - polarity list: every power-carrying pin, the net and declared voltage it should
+     land on, before first power
+   - staged power-up (a checklist ORDER, not literal hardware disconnection — a static
+     netlist can't simulate unplugging a sub-board): rails unloaded → power distribution
+     (every regulator/BEC/charge-controller's own output, checked before anything
+     downstream trusts it) → brain (MCU) → sensors → drive electronics, no motors
+     commanded yet → full
+   - bus enumeration: expected I²C scan result, generated from the identical
+     reassignment resolution E20 already checks against
    Completing the checklist *is* the as-built electrical record (RobotSpec §5 ritual for
-   the electrical domain; scale and tilt table's sibling).
+   the electrical domain; scale and tilt table's sibling). SVG diagram render (the other
+   M2 item) is not yet built.
 5. **Netlist hash** → RobotSpec identity chain.
 
 ## 5. Consumers
@@ -312,8 +323,11 @@ rather than a guess.
   mass roll-up (§4 items 1–2): also done — `robowire power <netlist> --robot <robot>`
   produces the merged, wiring-inclusive `DerivedRecord`; the old flat `harness-allowance`
   mass placeholder is retired.
-- **M2:** diagram render (SVG) + generated bench verification procedure; first physical
-  harness verified against its checklist (the electrical as-built ritual goes live).
+- **M2 — bench procedure done, diagram render not started:** generated bench
+  verification procedure (§4 item 4) is built and tested (`robowire/tests/bench.rs`);
+  SVG diagram render is still open. First physical harness verified against its
+  checklist (the electrical as-built ritual going live) is a real-world step, not a
+  code milestone — it happens whenever a harness from this repo actually gets built.
 - **M3:** arena-plant consumes the power graph — first brownout scenario runs against a
   derived, not hand-modelled, electrical topology.
 

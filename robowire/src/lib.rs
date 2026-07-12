@@ -10,6 +10,7 @@
 //! can gain consumers beyond robowire's designer without coupling them to
 //! netlist authoring or the E-check toolchain.
 
+pub mod bench;
 pub mod catalogue;
 pub mod checks;
 pub mod graph;

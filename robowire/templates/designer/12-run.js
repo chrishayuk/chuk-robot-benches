@@ -341,9 +341,13 @@
         const rows = channels.map(c => {
           const pin = `${inst}.${c.pin}`;
           const label = c.drives ? `${c.pin} → ${c.drives}` : `${c.pin} (unconnected downstream)`;
-          const v = runInputs.pwm_signals[pin] ?? 0;
+          // Real RC/ESC convention, the actual quantity a bench signal
+          // generator would be set to — not an abstract -1..1 fraction:
+          // 1000µs = full reverse, 1500µs = neutral, 2000µs = full forward.
+          const v = runInputs.pwm_signals[pin] ?? 1500;
           return `<div class="d" style="margin-top:4px">${label}` +
-            `<input type="range" class="runPwm" data-pin="${pin}" min="-1" max="1" step="0.05" value="${v}">` +
+            `<input type="range" class="runPwm" data-pin="${pin}" min="1000" max="2000" step="5" value="${v}"> ` +
+            `<span class="runPwmReadout" data-pin="${pin}">${v}µs</span>` +
             `</div>`;
         });
         return caption + rows.join("") + `<span class="runReadout"></span>`;
@@ -351,7 +355,11 @@
       wireRow: (inst, refs) => {
         for (const el of refs.row.querySelectorAll(".runPwm")) {
           const pin = el.dataset.pin;
-          el.addEventListener("input", () => setPwmSignal(pin, parseFloat(el.value)));
+          const readout = refs.row.querySelector(`.runPwmReadout[data-pin="${pin}"]`);
+          el.addEventListener("input", () => {
+            setPwmSignal(pin, parseFloat(el.value));
+            if (readout) readout.textContent = `${el.value}µs`;
+          });
         }
       },
     },

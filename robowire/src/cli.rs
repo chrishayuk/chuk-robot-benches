@@ -167,6 +167,32 @@ pub(crate) fn cmd_power(args: &[String]) {
     }
 }
 
+pub(crate) fn cmd_bench(args: &[String]) {
+    let flag = |name: &str| {
+        args.iter()
+            .position(|a| a == name)
+            .and_then(|i| args.get(i + 1).cloned())
+    };
+    let path = PathBuf::from(&args[0]);
+    let netlist: Netlist = serde_json::from_slice(
+        &std::fs::read(&path).unwrap_or_else(|e| die(&format!("{path:?}: {e}"))),
+    )
+    .unwrap_or_else(|e| die(&format!("parse: {e}")));
+    let parts_dir = PathBuf::from(flag("--parts").unwrap_or_else(|| "parts".into()));
+    let cat = ElecCatalogue::load(&parts_dir).unwrap_or_else(|e| die(&e));
+
+    let procedure = robowire::bench::generate(&netlist, &cat).unwrap_or_else(|e| die(&e));
+    let markdown = robowire::bench::render_markdown(&procedure);
+
+    match flag("--out") {
+        Some(out) => {
+            std::fs::write(&out, &markdown).unwrap_or_else(|e| die(&format!("writing {out}: {e}")));
+            println!("wrote {out}");
+        }
+        None => print!("{markdown}"),
+    }
+}
+
 pub(crate) fn cmd_design(args: &[String]) {
     let flag = |name: &str| {
         args.iter()
